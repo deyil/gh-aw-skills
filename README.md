@@ -304,7 +304,7 @@ npx skills add https://github.com/deyil/gh-aw-skills --skill gh-aw-workflow-auth
 
 ### Copilot suggests direct write permissions instead of `safe-outputs:`
 
-This means the authoring or maintenance skill didn't load. Confirm the skill is installed:
+This often means the authoring or maintenance skill didn't load. Other causes include model drift or incomplete context injection. Confirm the skill is installed:
 
 ```bash
 npx skills list | grep gh-aw
@@ -346,9 +346,10 @@ Fix all reported errors; do not commit a lock file that failed validation.
 
 | Capability | Current State | Notes |
 |------------|---------------|-------|
-| Multi-agent / fan-out workflows | ❌ Outside gh-aw scope | Use traditional GitHub Actions |
-| Cross-job state passing | ❌ Outside gh-aw scope | gh-aw is single-job |
-| Rollback orchestration | ❌ Outside gh-aw scope | Hybrid design recommended |
+| Multi-agent / fan-out workflows | ✅ Supported | Use `call-workflow` (compile-time fan-out) or `dispatch-workflow` (trigger up to 3 downstream workflows) |
+| Cross-job state passing | ✅ Supported | `workflow_call` safe-outputs expose values (e.g. `created_pr_number`) to calling workflows |
+| Cross-repo dispatch | ⚠️ Experimental | `dispatch_repository` output is experimental; see gh-aw safe-outputs docs |
+| Rollback orchestration | ⚠️ Hybrid | Design rollback logic in a called workflow; not natively modeled in a single gh-aw source file |
 | Auto-updating references | ⚠️ Manual | References are pinned in `*.md` files; update when gh-aw docs move |
 
 ---
@@ -379,13 +380,14 @@ npx skills update https://github.com/deyil/gh-aw-skills
 
 ### What engine does gh-aw use?
 
-gh-aw supports Copilot (default), Claude, and Codex. Configure the `engine:` field in your workflow's YAML frontmatter and ensure the matching secret is set:
+gh-aw supports Copilot (default), Claude, Codex, and Gemini. Configure the `engine:` field in your workflow's YAML frontmatter and ensure the matching secret is set:
 
 | Engine | Required secret |
 |--------|----------------|
 | Copilot | `COPILOT_GITHUB_TOKEN` |
 | Claude | `ANTHROPIC_API_KEY` |
 | Codex | `OPENAI_API_KEY` |
+| Gemini | `GEMINI_API_KEY` |
 
 ### How do I add a new skill to this repo?
 
