@@ -1,3 +1,4 @@
+---
 name: gh-aw-workflow-review
 description: "Review Github Agentic Workflows (gh-aw) and shared components for architectural fit, security guardrails, correctness, operational quality, and alignment with proven factory workflows when relevant."
 ---

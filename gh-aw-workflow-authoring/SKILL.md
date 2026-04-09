@@ -1,3 +1,4 @@
+---
 name: gh-aw-workflow-authoring
 description: "Create new GitHub Agentic Workflows, shared gh-aw components, and safe edits to workflow prompts or frontmatter with the right compile, security, tool patterns, and Peli's Agent Factory reuse rules."
 ---

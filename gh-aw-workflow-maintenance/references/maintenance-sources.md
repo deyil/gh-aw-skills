@@ -55,14 +55,24 @@ Use this section when editing or fixing workflows:
 
 ### Patterns Relevant To Maintenance
 
-- Monitoring: https://github.github.com/gh-aw/patterns/monitoring/
-- MultiRepoOps: https://github.github.com/gh-aw/patterns/multi-repo-ops/
-- WorkQueueOps: https://github.github.com/gh-aw/patterns/workqueue-ops/
 - BatchOps: https://github.github.com/gh-aw/patterns/batch-ops/
-- TrialOps: https://github.github.com/gh-aw/patterns/trial-ops/
+- CentralRepoOps: https://github.github.com/gh-aw/patterns/central-repo-ops/
+- ChatOps: https://github.github.com/gh-aw/patterns/chat-ops/
+- DailyOps: https://github.github.com/gh-aw/patterns/daily-ops/
+- DataOps: https://github.github.com/gh-aw/patterns/data-ops/
 - DispatchOps: https://github.github.com/gh-aw/patterns/dispatch-ops/
 - IssueOps: https://github.github.com/gh-aw/patterns/issue-ops/
 - LabelOps: https://github.github.com/gh-aw/patterns/label-ops/
+- MultiRepoOps: https://github.github.com/gh-aw/patterns/multi-repo-ops/
+- Monitoring: https://github.github.com/gh-aw/patterns/monitoring/
+- Orchestration: https://github.github.com/gh-aw/patterns/orchestration/
+- ProjectOps: https://github.github.com/gh-aw/patterns/project-ops/
+- ResearchPlanAssignOps: https://github.github.com/gh-aw/patterns/research-plan-assign-ops/
+- SideRepoOps: https://github.github.com/gh-aw/patterns/side-repo-ops/
+- SpecOps: https://github.github.com/gh-aw/patterns/spec-ops/
+- TaskOps: https://github.github.com/gh-aw/patterns/task-ops/
+- TrialOps: https://github.github.com/gh-aw/patterns/trial-ops/
+- WorkQueueOps: https://github.github.com/gh-aw/patterns/workqueue-ops/
 
 ### References Commonly Needed During Fixes
 

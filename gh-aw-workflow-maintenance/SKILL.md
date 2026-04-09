@@ -1,3 +1,4 @@
+---
 name: gh-aw-workflow-maintenance
 description: "Edit, fix, debug, update, and upgrade existing Github Agentic Workflows (gh-aw) with the correct recompile behavior, strict validation, run-analysis workflow, and factory-baseline comparisons when relevant."
 ---
