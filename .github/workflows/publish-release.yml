@@ -106,6 +106,18 @@ jobs:
 
           gh release create "${release_args[@]}"
 
+      - name: Trigger changelog sync workflow
+        if: inputs.draft == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          gh workflow run sync-changelog-from-release.yml \
+            --ref "${{ github.ref }}" \
+            -f tag="$TAG"
+
       - name: Summarize release
         env:
           GH_TOKEN: ${{ github.token }}
