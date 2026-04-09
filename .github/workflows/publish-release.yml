@@ -4,27 +4,28 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to create or publish, for example v1.2.3
-        required: true
+        description: Release tag to create or publish, for example v1.2.3. Leave blank to auto-increment the minor version of the last release.
+        required: false
+        default: ""
         type: string
       title:
-        description: Release title. Leave blank to reuse the tag.
+        description: Release title prefix. The resolved tag is always appended (e.g. "My Release v1.3.0"). Leave blank to use only the tag.
         required: false
         default: ""
         type: string
       target:
         description: Branch or commit to tag when the tag does not already exist.
-        required: true
+        required: false
         default: main
         type: string
       prerelease:
         description: Mark the release as a prerelease.
-        required: true
+        required: false
         default: false
         type: boolean
       draft:
         description: Create the release as a draft instead of publishing it.
-        required: true
+        required: false
         default: false
         type: boolean
 
@@ -46,37 +47,33 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate release inputs
-        env:
-          TAG: ${{ inputs.tag }}
-          TARGET: ${{ inputs.target }}
-        run: |
-          set -euo pipefail
-
-          if [[ -z "$TAG" ]]; then
-            echo "Release tag is required." >&2
-            exit 1
-          fi
-
-          if [[ -z "$TARGET" ]]; then
-            echo "Target branch or commit is required." >&2
-            exit 1
-          fi
-
       - name: Capture previous release
         id: previous_release
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
 
           previous_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=20" --jq 'map(select(.draft == false)) | .[0].tag_name // ""')"
           echo "tag=${previous_tag}" >> "$GITHUB_OUTPUT"
 
+          if [[ -n "$INPUT_TAG" ]]; then
+            resolved_tag="$INPUT_TAG"
+          elif [[ -n "$previous_tag" ]]; then
+            # Bump the minor segment and reset patch: v1.2.3 -> v1.3.0
+            resolved_tag="$(echo "$previous_tag" | perl -pe 's/^(v?\d+\.)(\d+)(\.\d+)$/$1 . ($2+1) . ".0"/e')"
+          else
+            echo "No tag provided and no previous release found to auto-increment from." >&2
+            exit 1
+          fi
+
+          echo "resolved_tag=${resolved_tag}" >> "$GITHUB_OUTPUT"
+
       - name: Create release with generated notes
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ steps.previous_release.outputs.resolved_tag }}
           TITLE: ${{ inputs.title }}
           TARGET: ${{ inputs.target }}
           PRERELEASE: ${{ inputs.prerelease }}
@@ -84,9 +81,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          release_title="$TAG"
           if [[ -n "$TITLE" ]]; then
-            release_title="$TITLE"
+            release_title="$TITLE $TAG"
+          else
+            release_title="$TAG"
           fi
 
           release_args=(
@@ -109,7 +107,7 @@ jobs:
       - name: Summarize release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ steps.previous_release.outputs.resolved_tag }}
           TARGET: ${{ inputs.target }}
           PREVIOUS_TAG: ${{ steps.previous_release.outputs.tag }}
         run: |
