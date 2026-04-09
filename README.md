@@ -1,8 +1,4 @@
-# gh-aw-skills
-
-<div align="center">
-  <img src="https://github.com/deyil/gh-aw-skills/raw/main/assets/gh-aw-skills.webp" alt="gh-aw-skills – Agent skills for GitHub Agentic Workflows">
-</div>
+# gh-aw-skills: Agent skills for GitHub Agentic Workflows
 
 <div align="center">
 
@@ -33,7 +29,7 @@ npx skills add https://github.com/deyil/gh-aw-skills --skill gh-aw-workflow-main
 
 ---
 
-## TL;DR
+## What Are gh-aw-skills?
 
 **The Problem**: GitHub Agentic Workflows (gh-aw) have their own frontmatter schema, single-job execution model, safe-outputs write pattern, and Peli's Agent Factory catalog. Without purpose-built guidance, AI assistants fall back on generic GitHub Actions assumptions — and produce workflows that validate poorly, have unsafe write patterns, or re-invent workflows that already exist in the factory.
 
