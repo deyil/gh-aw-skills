@@ -1,11 +1,11 @@
 ---
 name: gh-aw-workflow-review
-description: "Review gh-aw workflows and shared components for architectural fit, security guardrails, correctness, and operational quality before or after changes land."
+description: "Review Github Agentic Workflows (gh-aw) and shared components for architectural fit, security guardrails, correctness, and operational quality before or after changes land."
 ---
 
 # GH-AW Workflow Review
 
-Use this skill when the user wants a design review, security review, correctness review, or code review of gh-aw workflows, imports, prompts, or shared components.
+Use this skill when the user wants a design review, security review, correctness review, or code review of Github Agentic Workflows, imports, prompts, or shared components.
 
 ## Start Here
 

@@ -1,11 +1,11 @@
 ---
 name: gh-aw-workflow-maintenance
-description: "Edit, fix, debug, update, and upgrade existing gh-aw workflows with the correct recompile behavior, strict validation, and run-analysis workflow."
+description: "Edit, fix, debug, update, and upgrade existing Github Agentic Workflows (gh-aw) with the correct recompile behavior, strict validation, and run-analysis workflow."
 ---
 
 # GH-AW Workflow Maintenance
 
-Use this skill when the user wants to edit an existing gh-aw workflow, fix a broken workflow, debug a run, upgrade workflows to a newer gh-aw version, or apply targeted maintenance to shared components.
+Use this skill when the user wants to edit an existing Github Agentic Workflow, fix a broken workflow, debug a run, upgrade workflows to a newer gh-aw version, or apply targeted maintenance to shared components.
 
 ## Start Here
 

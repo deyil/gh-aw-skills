@@ -5,7 +5,7 @@ description: "Create new GitHub Agentic Workflows, shared gh-aw components, and 
 
 # GH-AW Workflow Authoring
 
-Use this skill when the user wants to create a new gh-aw workflow, scaffold a shared gh-aw component, or make deliberate authoring changes to workflow files.
+Use this skill when the user wants to create a new Github Agentic Workflow, scaffold a shared gh-aw component, or make deliberate authoring changes to workflow files.
 
 ## Start Here
 
