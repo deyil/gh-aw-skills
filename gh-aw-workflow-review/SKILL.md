@@ -11,6 +11,12 @@ Use this skill when the user wants a design review, security review, correctness
 
 Before reviewing, consult `references/review-sources.md` so findings are based on current gh-aw semantics rather than generic GitHub Actions assumptions.
 
+## Example Prompts
+
+- "Review this gh-aw workflow for unsafe writes, missing safe outputs, and single-job model issues."
+- "Audit the workflow source and lock pair for compile, guardrail, and operability problems."
+- "Check whether this workflow design fits gh-aw or should be split into traditional GitHub Actions."
+
 ## Review Lens
 
 Review workflows against these categories.
@@ -21,7 +27,14 @@ Review workflows against these categories.
 - Is the design trying to wait on external events, coordinate multi-stage pipelines, or move state between jobs in a way gh-aw does not support?
 - Should the solution be split into simpler gh-aw units or moved to traditional GitHub Actions?
 
-### 2. Security And Guardrails
+### 2. Setup And Bootstrap Correctness
+
+- Does the repository setup match the workflow's intended authoring path?
+- If the design depends on GitHub.com or mobile `/agent agentic-workflows` authoring, has the repository been initialized appropriately?
+- If the workflow is described as manually maintained, are both the markdown source and compiled lock file present?
+- Is the selected engine compatible with the repository's configured secret and expected runtime environment?
+
+### 3. Security And Guardrails
 
 - Is the agent job read-only?
 - Are write operations routed through `safe-outputs:` instead of direct write permissions?
@@ -30,7 +43,7 @@ Review workflows against these categories.
 - Is untrusted user content treated as untrusted, and is sanitized context used where appropriate?
 - Are risky features like auto-merge or unsafe credential patterns being proposed?
 
-### 3. Authoring Correctness
+### 4. Authoring Correctness
 
 - Are the source `.md` and compiled `.lock.yml` treated as a pair?
 - Is the workflow structure valid for gh-aw frontmatter and markdown semantics?
@@ -38,15 +51,16 @@ Review workflows against these categories.
 - Are MCP servers configured appropriately, with read-only allowlists where possible?
 - Are shared components scoped narrowly and imported cleanly?
 
-### 4. Operability
+### 5. Operability
 
 - Can the workflow be compiled and validated cleanly?
 - If it depends on `agentic-workflows:` introspection tools, does it have `actions: read`?
 - Does the prompt tell the agent what to do when no action is needed, typically via `noop`?
 - Are schedules, rate limits, skip rules, or duplicate-prevention settings appropriate?
 - Is there a realistic debugging path using `logs`, `audit`, `mcp inspect`, or `health`?
+- Are first-run prerequisites covered, including Actions enablement and engine-secret setup?
 
-### 5. Maintainability
+### 6. Maintainability
 
 - Are defaults omitted instead of restated noisily?
 - Is the prompt concise, explicit, and testable?
@@ -73,6 +87,9 @@ Review workflows against these categories.
 
 - Direct write permissions on the agent job.
 - Broad or implicit network access.
+- A workflow markdown file without its compiled `.lock.yml`, or a stale lock file after frontmatter changes.
+- A workflow that assumes GitHub.com or mobile authoring support without repository initialization.
+- An engine/secret mismatch that guarantees first-run failure.
 - Use of unsupported orchestration patterns.
 - Missing `actions: read` for workflow-introspection tooling.
 - GitHub mutation operations modeled as tools instead of safe outputs.

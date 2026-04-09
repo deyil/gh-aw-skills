@@ -11,6 +11,18 @@ Use this skill when the user wants to edit an existing Github Agentic Workflow, 
 
 Before changing anything, consult `references/maintenance-sources.md`.
 
+## Example Prompts
+
+- "Update the existing gh-aw workflow to use a new engine secret and recompile the lock file."
+- "Fix the failing gh-aw run for this workflow using the run URL and the current source files."
+- "Upgrade all gh-aw workflows in the repository to the latest supported patterns without changing prompt-only behavior."
+
+Confirm the operational baseline before editing:
+
+- The active workflow should exist as both `.github/workflows/<name>.md` and `.github/workflows/<name>.lock.yml`.
+- If the repository was initialized for GitHub.com or mobile authoring, related bootstrap artifacts such as `.github/agents/agentic-workflows.agent.md` may also be part of the expected setup.
+- Engine-specific secrets and GitHub Actions availability are part of the runtime contract, so missing-run failures are not always authoring bugs.
+
 Then classify the work:
 
 - Prompt-only behavior update: edit only the markdown body.
@@ -27,6 +39,11 @@ Then classify the work:
 5. Prefer strict validation and secure defaults over relaxing guardrails.
 6. Keep GitHub writes inside `safe-outputs:`. Do not add direct write permissions to the agent job.
 7. Use `toolsets:` for GitHub tools. Do not reintroduce unsupported or deprecated patterns such as `mode: remote` for GitHub tools in normal workflow designs.
+8. When runs fail immediately in a fresh repository, check setup first:
+   - Missing engine secret
+   - Wrong `engine:` value for the configured secret
+   - GitHub Actions disabled
+   - Sample workflow added but never recompiled after frontmatter edits
 
 ## Recommended Flows
 
@@ -36,6 +53,7 @@ Then classify the work:
 2. For body-only edits, update the prompt and stop there unless the user asked for validation.
 3. For frontmatter edits, change the smallest possible YAML surface.
 4. Recompile and validate. Prefer `gh aw compile --strict` or `gh aw validate` when available.
+5. If the user started from a quickstart sample such as `gh aw add-wizard`, preserve the sample's working setup unless the requested behavior requires a deliberate config change.
 
 ### Debugging Failures
 
@@ -47,6 +65,8 @@ Then classify the work:
    - Network/firewall denials
    - MCP startup failures
    - Permission or auth failures
+   - Missing repository initialization for the intended authoring mode
+   - Missing or mismatched engine secrets
    - Excessive token usage or long runtimes
 4. If the problem is tool availability, compare the requested tool name against configured `tools:` and `safe-outputs:` names.
 5. Validate the fix with compile before closing the loop.
@@ -81,3 +101,4 @@ If the CLI is unavailable or unauthenticated in the execution environment, use t
 - Safe-output failures: fix the `safe-outputs:` block rather than adding write permissions.
 - Compile errors: run fixers first, then address schema errors precisely.
 - High token use: shorten prompts, prefetch deterministic data, or add cache-memory where repeated analysis is expected.
+- Quickstart customization regressions: if a user edited frontmatter on a sample workflow and skipped `gh aw compile`, regenerate the lock file before chasing deeper runtime issues.
