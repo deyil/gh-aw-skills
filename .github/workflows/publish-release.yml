@@ -1,0 +1,131 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create or publish, for example v1.2.3
+        required: true
+        type: string
+      title:
+        description: Release title. Leave blank to reuse the tag.
+        required: false
+        default: ""
+        type: string
+      target:
+        description: Branch or commit to tag when the tag does not already exist.
+        required: true
+        default: main
+        type: string
+      prerelease:
+        description: Mark the release as a prerelease.
+        required: true
+        default: false
+        type: boolean
+      draft:
+        description: Create the release as a draft instead of publishing it.
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release inputs
+        env:
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$TAG" ]]; then
+            echo "Release tag is required." >&2
+            exit 1
+          fi
+
+          if [[ -z "$TARGET" ]]; then
+            echo "Target branch or commit is required." >&2
+            exit 1
+          fi
+
+      - name: Capture previous release
+        id: previous_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          previous_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=20" --jq 'map(select(.draft == false)) | .[0].tag_name // ""')"
+          echo "tag=${previous_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Create release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          TITLE: ${{ inputs.title }}
+          TARGET: ${{ inputs.target }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          DRAFT: ${{ inputs.draft }}
+        run: |
+          set -euo pipefail
+
+          release_title="$TAG"
+          if [[ -n "$TITLE" ]]; then
+            release_title="$TITLE"
+          fi
+
+          release_args=(
+            "$TAG"
+            --title "$release_title"
+            --target "$TARGET"
+            --generate-notes
+          )
+
+          if [[ "$PRERELEASE" == "true" ]]; then
+            release_args+=(--prerelease)
+          fi
+
+          if [[ "$DRAFT" == "true" ]]; then
+            release_args+=(--draft)
+          fi
+
+          gh release create "${release_args[@]}"
+
+      - name: Summarize release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ inputs.target }}
+          PREVIOUS_TAG: ${{ steps.previous_release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          release_url="$(gh release view "$TAG" --json url --jq '.url')"
+
+          {
+            echo "### Release published"
+            echo
+            echo "- Tag: $TAG"
+            echo "- Target: $TARGET"
+            if [[ -n "$PREVIOUS_TAG" ]]; then
+              echo "- Previous release: $PREVIOUS_TAG"
+            else
+              echo "- Previous release: none"
+            fi
+            echo "- URL: $release_url"
+          } >> "$GITHUB_STEP_SUMMARY"

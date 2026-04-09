@@ -1,0 +1,204 @@
+name: Sync Changelog From Release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-changelog
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync changelog entry
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare release metadata
+        id: meta
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          NAME: ${{ github.event.release.name }}
+          URL: ${{ github.event.release.html_url }}
+          PUBLISHED_AT: ${{ github.event.release.published_at }}
+          BODY: ${{ github.event.release.body }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$TAG" ]]; then
+            echo "Release tag is required." >&2
+            exit 1
+          fi
+
+          if [[ ! "$TAG" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Release tag contains unsupported characters: $TAG" >&2
+            exit 1
+          fi
+
+          branch_tag="$(printf '%s' "$TAG" | tr -c 'A-Za-z0-9._-' '-')"
+          branch_name="changelog/${branch_tag}"
+          release_title="$TAG"
+          if [[ -n "$NAME" ]]; then
+            release_title="$NAME"
+          fi
+
+          release_date="${PUBLISHED_AT%%T*}"
+          if [[ -z "$release_date" ]]; then
+            release_date="$(date -u +%F)"
+          fi
+
+          if [[ "$PRERELEASE" == "true" ]]; then
+            heading="## [$release_title]($URL) - $release_date [prerelease]"
+          else
+            heading="## [$release_title]($URL) - $release_date"
+          fi
+
+          heading_delimiter="heading-$(uuidgen)"
+          body_delimiter="body-$(uuidgen)"
+          {
+            echo "branch=$branch_name"
+            echo "heading<<$heading_delimiter"
+            printf '%s\n' "$heading"
+            echo "$heading_delimiter"
+            echo "body<<$body_delimiter"
+            if [[ -n "$BODY" ]]; then
+              printf '%s\n' "$BODY"
+            else
+              echo "- No release notes were provided for this release."
+            fi
+            echo "$body_delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update changelog
+        id: changelog
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          HEADING: ${{ steps.meta.outputs.heading }}
+          BODY: ${{ steps.meta.outputs.body }}
+          URL: ${{ github.event.release.html_url }}
+        run: |
+          set -euo pipefail
+
+          tmp_file=''
+          trap 'if [[ -n "$tmp_file" ]]; then rm -f "$tmp_file"; fi' EXIT
+
+          if [[ -f CHANGELOG.md ]] && awk -v url="$URL" '
+            /^## \[/ && index($0, "](" url ")") { found=1; exit }
+            END { exit !found }
+          ' CHANGELOG.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          tmp_file="$(mktemp)"
+          {
+            echo "# Changelog"
+            echo
+            echo "All notable changes to this project will be documented in this file."
+            echo
+            echo "Release entries are synchronized from published GitHub releases."
+            echo
+            echo "$HEADING"
+            echo
+            printf '%s\n' "$BODY"
+            echo
+            if [[ -f CHANGELOG.md ]]; then
+              sed -n '/^## /,$p' CHANGELOG.md
+            fi
+          } > "$tmp_file"
+
+          mv "$tmp_file" CHANGELOG.md
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit changelog update
+        if: steps.changelog.outputs.changed == 'true'
+        env:
+          BRANCH_NAME: ${{ steps.meta.outputs.branch }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -B "$BRANCH_NAME"
+          git add CHANGELOG.md
+
+          commit_message_file="$(mktemp)"
+          trap 'rm -f "$commit_message_file"' EXIT
+          printf 'docs: update changelog for %s\n' "$TAG" > "$commit_message_file"
+
+          git commit -F "$commit_message_file"
+          git push --force-with-lease --set-upstream origin "$BRANCH_NAME"
+
+      - name: Open pull request
+        if: steps.changelog.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: ${{ steps.meta.outputs.branch }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          body_file=''
+          trap 'if [[ -n "$body_file" ]]; then rm -f "$body_file"; fi' EXIT
+
+          if ! existing_pr="$(gh pr list --head "$BRANCH_NAME" --state open --json number --jq '.[0].number // empty')"; then
+            echo "Failed to query existing pull requests for $BRANCH_NAME." >&2
+            exit 1
+          fi
+
+          if [[ -n "$existing_pr" ]]; then
+            pr_url="$(gh pr view "$existing_pr" --json url --jq '.url')"
+            echo "pr_url=$pr_url" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          body_file="$(mktemp)"
+          cat <<EOF > "$body_file"
+          ## Summary
+
+          - prepend the published $TAG release notes to CHANGELOG.md
+
+          ## Testing
+
+          - workflow generated from release event
+          EOF
+
+          pr_url="$(gh pr create \
+            --base "$DEFAULT_BRANCH" \
+            --head "$BRANCH_NAME" \
+            --title "docs: update changelog for $TAG" \
+            --body-file "$body_file")"
+
+          echo "pr_url=$pr_url" >> "$GITHUB_ENV"
+
+      - name: Summarize changelog sync
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          CHANGED: ${{ steps.changelog.outputs.changed }}
+          PR_URL: ${{ env.pr_url }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "### Changelog sync"
+            echo
+            echo "- Release: $TAG"
+            echo "- Changelog updated: $CHANGED"
+            if [[ -n "$PR_URL" ]]; then
+              echo "- Pull request: $PR_URL"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
