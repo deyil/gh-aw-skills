@@ -8,6 +8,25 @@ Use these sources to ground review comments in actual gh-aw behavior.
 - Full docs: https://github.github.com/gh-aw/llms-full.txt
 - Sitemap index: https://github.github.com/gh-aw/sitemap-index.xml
 - Sitemap body: https://github.github.com/gh-aw/sitemap-0.xml
+- Agent Factory status index: https://github.github.com/gh-aw/agent-factory-status/
+- Agent Factory workflow source tree: https://github.com/github/gh-aw/tree/main/.github/workflows
+
+## Peli's Agent Factory
+
+- Welcome post and rationale: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
+- Factory status section: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/#factory-status
+- Meet the Workflows landing page: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/
+- Issue and PR management workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-issue-management/
+- Fault investigation workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-quality-hygiene/
+- Documentation workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-documentation/
+- Security and compliance workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-security-compliance/
+- Interactive and ChatOps workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-interactive-chatops/
+- Organization and cross-repo workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-organization/
+
+Use this section to calibrate review findings:
+
+- Exact factory match: compare the reviewed workflow against the upstream source and call out unjustified divergence.
+- Near factory match: use the closest workflow and write-up to sharpen review heuristics, but do not require perfect upstream conformity.
 
 ## Core Review Sources
 
@@ -136,4 +155,5 @@ Use these sources to ground review comments in actual gh-aw behavior.
 
 - Check whether the proposal is actually compatible with single-job agent execution.
 - Prefer explicit gh-aw references over generic GitHub Actions intuition.
+- When a ready-to-use factory workflow exists for the same job, review whether the bespoke design is materially better or just more complex.
 - Use the sitemap and llms endpoints when you suspect the docs have moved or a newer page exists.

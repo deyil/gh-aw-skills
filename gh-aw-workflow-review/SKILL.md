@@ -1,6 +1,5 @@
----
 name: gh-aw-workflow-review
-description: "Review Github Agentic Workflows (gh-aw) and shared components for architectural fit, security guardrails, correctness, and operational quality before or after changes land."
+description: "Review Github Agentic Workflows (gh-aw) and shared components for architectural fit, security guardrails, correctness, operational quality, and alignment with proven factory workflows when relevant."
 ---
 
 # GH-AW Workflow Review
@@ -11,11 +10,17 @@ Use this skill when the user wants a design review, security review, correctness
 
 Before reviewing, consult `references/review-sources.md` so findings are based on current gh-aw semantics rather than generic GitHub Actions assumptions.
 
+When the workflow request resembles something already covered by Peli's Agent Factory, review against the closest ready-to-use workflow as an additional comparison point:
+
+- Exact match: check whether the repository should have reused or lightly adapted the existing factory workflow.
+- Near match: use the closest workflow and blog write-up as inspiration for review heuristics, not as a mandatory template.
+
 ## Example Prompts
 
 - "Review this gh-aw workflow for unsafe writes, missing safe outputs, and single-job model issues."
 - "Audit the workflow source and lock pair for compile, guardrail, and operability problems."
 - "Check whether this workflow design fits gh-aw or should be split into traditional GitHub Actions."
+- "Review whether this bespoke workflow should have started from an existing Agent Factory workflow instead of reinventing the pattern."
 
 ## Review Lens
 
@@ -70,6 +75,7 @@ Review workflows against these categories.
 ## Evidence To Use
 
 - The current `.md` workflow file and corresponding `.lock.yml`.
+- The closest matching workflow or category from Peli's Agent Factory, when the requested behavior already exists there.
 - `gh aw compile --strict` or `gh aw validate` results when available.
 - `gh aw audit` and `gh aw logs` output for behavior-based findings.
 - `gh aw mcp inspect` output for MCP and tool configuration findings.
@@ -88,6 +94,7 @@ Review workflows against these categories.
 - Direct write permissions on the agent job.
 - Broad or implicit network access.
 - A workflow markdown file without its compiled `.lock.yml`, or a stale lock file after frontmatter changes.
+- A bespoke workflow that duplicates a ready-to-use factory workflow without a repository-specific reason.
 - A workflow that assumes GitHub.com or mobile authoring support without repository initialization.
 - An engine/secret mismatch that guarantees first-run failure.
 - Use of unsupported orchestration patterns.

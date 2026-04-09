@@ -11,6 +11,28 @@ Use these sources in roughly this order when creating or substantially redesigni
 - Workflow pattern set: https://github.github.com/gh-aw/_llms-txt/agentic-workflows.txt
 - Sitemap index: https://github.github.com/gh-aw/sitemap-index.xml
 - Sitemap body: https://github.github.com/gh-aw/sitemap-0.xml
+- Agent Factory status index: https://github.github.com/gh-aw/agent-factory-status/
+- Agent Factory workflow source tree: https://github.com/github/gh-aw/tree/main/.github/workflows
+
+## Peli's Agent Factory
+
+- Welcome post and rationale: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
+- Factory status section: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/#factory-status
+- Meet the Workflows landing page: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/
+- Issue and PR management workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-issue-management/
+- Fault investigation workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-quality-hygiene/
+- Documentation workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-documentation/
+- Testing and validation workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-testing-validation/
+- Security and compliance workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-security-compliance/
+- Metrics and analytics workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-metrics-analytics/
+- Interactive and ChatOps workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-interactive-chatops/
+- Tool and infrastructure workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-tool-infrastructure/
+- Multi-phase workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-multi-phase/
+
+Use this section as a workflow router before bespoke authoring:
+
+- If the user's request matches a ready-to-use factory workflow, reuse that upstream `.md` file as the starting point.
+- If the match is only partial, use the nearest workflow source and blog/category write-up as inspiration, then adapt for the user's repository and constraints.
 
 ## Canonical Upstream Sources
 
@@ -151,5 +173,6 @@ This section mirrors the high-value documentation index exposed from the overvie
 - New workflows live in `.github/workflows/<workflow-id>.md` and compile to `.github/workflows/<workflow-id>.lock.yml`.
 - Markdown body edits can be shipped without recompilation; frontmatter edits require `gh aw compile`.
 - `gh aw new` can scaffold a template, but upstream prompt-driven authoring is the more authoritative source for design guidance.
+- The Agent Factory status page is a ready-to-use index: each workflow row links to a concrete `.github/workflows/*.md` source file you can inspect and adapt.
 - Favor `tools.github.toolsets` for GitHub reads and `safe-outputs` for writes.
 - Use sitemap-driven discovery if the docs navigation changes or a page moves.

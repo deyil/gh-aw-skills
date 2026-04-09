@@ -8,6 +8,24 @@ Use these sources when editing, debugging, fixing, or upgrading existing gh-aw w
 - Full docs: https://github.github.com/gh-aw/llms-full.txt
 - Sitemap index: https://github.github.com/gh-aw/sitemap-index.xml
 - Sitemap body: https://github.github.com/gh-aw/sitemap-0.xml
+- Agent Factory status index: https://github.github.com/gh-aw/agent-factory-status/
+- Agent Factory workflow source tree: https://github.com/github/gh-aw/tree/main/.github/workflows
+
+## Peli's Agent Factory
+
+- Welcome post and rationale: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
+- Factory status section: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/#factory-status
+- Meet the Workflows landing page: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/
+- Fault investigation workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-quality-hygiene/
+- Documentation workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-documentation/
+- Testing and validation workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-testing-validation/
+- Metrics and analytics workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-metrics-analytics/
+- Operations and release workflows: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-operations-release/
+
+Use this section when editing or fixing workflows:
+
+- Exact factory match: compare against the upstream workflow source before making local changes.
+- Near factory match: borrow the closest proven pattern or debugging approach, but keep local triggers, permissions, secrets, and outputs authoritative.
 
 ## Canonical Docs
 
@@ -111,4 +129,5 @@ Use these sources when editing, debugging, fixing, or upgrading existing gh-aw w
 - Audit a concrete run before speculating.
 - Compare requested tool names with configured tool and safe-output names.
 - Check network denials and ecosystem mismatches before adding broad allowlists.
+- If the workflow resembles a factory workflow, compare against that upstream source before inventing a new fix path.
 - Prefer `agentic-workflows` MCP tool equivalents when `gh aw` CLI auth is unavailable.

@@ -1,6 +1,5 @@
----
 name: gh-aw-workflow-maintenance
-description: "Edit, fix, debug, update, and upgrade existing Github Agentic Workflows (gh-aw) with the correct recompile behavior, strict validation, and run-analysis workflow."
+description: "Edit, fix, debug, update, and upgrade existing Github Agentic Workflows (gh-aw) with the correct recompile behavior, strict validation, run-analysis workflow, and factory-baseline comparisons when relevant."
 ---
 
 # GH-AW Workflow Maintenance
@@ -10,6 +9,11 @@ Use this skill when the user wants to edit an existing Github Agentic Workflow, 
 ## Start Here
 
 Before changing anything, consult `references/maintenance-sources.md`.
+
+If the requested behavior or regression aligns with a workflow in Peli's Agent Factory, compare against that upstream workflow first:
+
+- Exact match: use the factory workflow source as the baseline for what the workflow should look like now.
+- Near match: use the closest factory workflow and related write-up as inspiration for the fix, but keep the repository's own requirements primary.
 
 ## Example Prompts
 
@@ -29,6 +33,7 @@ Then classify the work:
 - Frontmatter/config change: edit YAML, then recompile.
 - Run failure or missing tool investigation: use the debug flow.
 - Bulk upgrade or deprecation cleanup: use the upgrade flow.
+- Factory-aligned sync or adaptation: compare the existing workflow with the exact or nearest factory workflow before editing.
 
 ## Maintenance Rules
 
@@ -44,6 +49,8 @@ Then classify the work:
    - Wrong `engine:` value for the configured secret
    - GitHub Actions disabled
    - Sample workflow added but never recompiled after frontmatter edits
+9. When the task matches a ready-to-use factory workflow, prefer aligning to that proven source over inventing a new maintenance pattern.
+10. When only adjacent factory workflows exist, treat them as inspiration and extract the smallest relevant fix or pattern instead of forcing a full upstream rewrite.
 
 ## Recommended Flows
 
@@ -54,6 +61,14 @@ Then classify the work:
 3. For frontmatter edits, change the smallest possible YAML surface.
 4. Recompile and validate. Prefer `gh aw compile --strict` or `gh aw validate` when available.
 5. If the user started from a quickstart sample such as `gh aw add-wizard`, preserve the sample's working setup unless the requested behavior requires a deliberate config change.
+
+### Factory-Derived Updates
+
+1. Find the exact or nearest matching workflow in Peli's Agent Factory.
+2. Compare the current repository workflow against that upstream source before changing anything.
+3. Reuse the exact upstream structure only when the user's requested behavior truly matches it.
+4. If the fit is partial, borrow the smallest useful prompt or frontmatter patterns and preserve local requirements that the factory workflow does not model.
+5. Compile after frontmatter changes and verify the adapted workflow still matches the repository's engine, secrets, permissions, and triggers.
 
 ### Debugging Failures
 

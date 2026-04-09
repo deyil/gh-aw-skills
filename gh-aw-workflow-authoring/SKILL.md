@@ -1,6 +1,5 @@
----
 name: gh-aw-workflow-authoring
-description: "Create new GitHub Agentic Workflows, shared gh-aw components, and safe edits to workflow prompts or frontmatter with the right compile, security, and tool patterns."
+description: "Create new GitHub Agentic Workflows, shared gh-aw components, and safe edits to workflow prompts or frontmatter with the right compile, security, tool patterns, and Peli's Agent Factory reuse rules."
 ---
 
 # GH-AW Workflow Authoring
@@ -10,6 +9,12 @@ Use this skill when the user wants to create a new Github Agentic Workflow, scaf
 ## Start Here
 
 Before designing anything, consult `references/authoring-sources.md`.
+
+Use Peli's Agent Factory as the first routing check for workflow requests:
+
+- If the user's requested workflow already exists in the Agent Factory index, start from that ready-to-use workflow source instead of authoring from scratch.
+- If there is no exact match but there is a close factory workflow or category write-up, use that source and the related blog guidance as inspiration, then adapt only the parts needed for the user's repository and constraints.
+- If the request is clearly outside the factory catalog, continue with normal bespoke authoring.
 
 ## Example Prompts
 
@@ -25,6 +30,8 @@ Anchor the starting point before authoring:
 
 Route the task first:
 
+- Exact match in Peli's Agent Factory: reuse that upstream workflow `.md` source as the starting point, then adapt it deliberately.
+- Partial match in Peli's Agent Factory: use the closest workflow and related blog/category article as inspiration, but do not force an ill-fitting copy.
 - New workflow from scratch: use the upstream authoring flow from `create.md` and `create-agentic-workflow.md`.
 - Shared import or MCP wrapper: use `create-shared-agentic-workflow.md`.
 - Existing workflow edits or fixes: prefer the `gh-aw-workflow-maintenance` skill.
@@ -55,16 +62,17 @@ Route the task first:
 
 ## Workflow Design Process
 
-1. Refresh against current docs using `llms.txt` or `llms-full.txt`, then use the sitemap files to locate newer pages if needed.
+1. Refresh against current docs using `llms.txt` or `llms-full.txt`, then check Peli's Agent Factory for an exact or adjacent workflow before drafting a bespoke design.
 2. Confirm the authoring path:
    - Initialized repo for GitHub.com or mobile `/agent agentic-workflows` usage.
    - Coding-agent flow using the upstream `create.md` prompt.
    - Manual editing plus local compile.
-3. Identify the trigger, GitHub read scope, external systems, write side effects, and repo language.
-4. Draft the smallest frontmatter that satisfies the use case.
-5. Draft a prompt body that is explicit about task, constraints, and safe outputs.
-6. Compile after frontmatter changes and fix all validation errors before stopping.
-7. Tell the user how to trigger the first run, typically from the Actions tab or `gh aw run <workflow-name>`.
+3. If a factory workflow is a fit, identify whether it should be reused mostly as-is or remixed around the user's trigger, write path, repo language, and external systems.
+4. Identify the trigger, GitHub read scope, external systems, write side effects, and repo language.
+5. Draft the smallest frontmatter that satisfies the use case.
+6. Draft a prompt body that is explicit about task, constraints, and safe outputs.
+7. Compile after frontmatter changes and fix all validation errors before stopping.
+8. Tell the user how to trigger the first run, typically from the Actions tab or `gh aw run <workflow-name>`.
 
 ## Common Patterns
 
@@ -73,9 +81,11 @@ Route the task first:
 - Shared components: keep them focused, prefer containerized MCP servers, keep read-only tool allowlists tight, and document source links in XML comments or reference material.
 - Prompt-only refinements: update the markdown body only and do not force a needless recompile.
 - Quickstart bootstrap requests: prefer `gh aw add-wizard` when the user wants a proven example to customize, then edit the markdown body before touching frontmatter.
+- Factory-first requests: when the ask maps cleanly to a factory workflow such as triage, PR review, documentation upkeep, fault investigation, or analytics, adapt the existing upstream workflow before inventing a new one.
 
 ## Deliverables
 
 - One focused workflow or shared component per task unless the user explicitly wants a bundle.
 - Up-to-date links back to the authoritative gh-aw docs and raw prompt files.
+- If the workflow came from Peli's Agent Factory, state whether it was an exact-match reuse or an inspired-by adaptation.
 - Clear distinction between changes that need recompilation and those that do not.
