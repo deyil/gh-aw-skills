@@ -6,7 +6,6 @@ Use these sources in roughly this order when creating or substantially redesigni
 
 ## Read First
 
-- Full docs: https://github.github.com/gh-aw/llms-full.txt
 - Agent Factory status index: https://github.github.com/gh-aw/agent-factory-status/
 - Agent Factory workflow source tree: https://github.com/github/gh-aw/tree/main/.github/workflows
 - Creating workflows guide: https://github.github.com/gh-aw/setup/creating-workflows/
@@ -35,7 +34,7 @@ Use these sources in roughly this order when creating or substantially redesigni
 
 ## Discovery Fallback
 
-- llms index: https://github.github.com/gh-aw/llms.txt
+- Full docs: https://github.github.com/gh-aw/llms-full.txt
 - Sitemap index: https://github.github.com/gh-aw/sitemap-index.xml
 
 ## Practical Authoring Notes

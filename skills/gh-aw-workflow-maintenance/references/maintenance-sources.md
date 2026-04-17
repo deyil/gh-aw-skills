@@ -6,7 +6,6 @@ Use these sources when editing, debugging, fixing, or upgrading existing gh-aw w
 
 ## Read First
 
-- Full docs: https://github.github.com/gh-aw/llms-full.txt
 - Agent Factory status index: https://github.github.com/gh-aw/agent-factory-status/
 - Agent Factory workflow source tree: https://github.com/github/gh-aw/tree/main/.github/workflows
 - Debugging guide: https://github.github.com/gh-aw/troubleshooting/debugging/
@@ -24,6 +23,11 @@ Use these sources when editing, debugging, fixing, or upgrading existing gh-aw w
 - GH-AW as MCP server: https://github.github.com/gh-aw/reference/gh-aw-as-mcp-server/
 - Network access: https://github.github.com/gh-aw/reference/network/
 - GitHub read tools: https://github.github.com/gh-aw/reference/github-tools/
+
+## Discovery Fallback
+
+- Full docs: https://github.github.com/gh-aw/llms-full.txt
+- Sitemap index: https://github.github.com/gh-aw/sitemap-index.xml
 
 ## Raw Prompts
 
