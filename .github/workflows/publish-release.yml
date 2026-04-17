@@ -123,7 +123,7 @@ jobs:
         if: inputs.draft == false
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ steps.previous_release.outputs.resolved_tag }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
