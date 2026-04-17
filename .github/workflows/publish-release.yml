@@ -30,6 +30,7 @@ on:
         type: boolean
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -117,6 +118,19 @@ jobs:
           fi
 
           gh release create "${release_args[@]}"
+
+      - name: Trigger changelog sync workflow
+        if: inputs.draft == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          gh workflow run sync-changelog-from-release.yml \
+            --ref "$REF_NAME" \
+            -f tag="$TAG"
 
       - name: Summarize release
         env:
