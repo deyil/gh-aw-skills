@@ -55,7 +55,8 @@ jobs:
 
           # If triggered by workflow_dispatch, fetch release data from GitHub API
           if [[ -z "$URL" ]]; then
-            release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
+            encoded_tag="$(jq -rn --arg tag "$TAG" '$tag|@uri')"
+            release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${encoded_tag}")"
             NAME="$(echo "$release_json" | jq -r '.name // ""')"
             URL="$(echo "$release_json" | jq -r '.html_url')"
             PUBLISHED_AT="$(echo "$release_json" | jq -r '.published_at // ""')"
@@ -192,7 +193,7 @@ jobs:
 
           ## Testing
 
-          - workflow generated from release event
+          - workflow generated from release event or workflow_dispatch
           EOF
 
           pr_url="$(gh pr create \
