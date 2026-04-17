@@ -11,6 +11,8 @@ Use this skill when the user wants to create a new Github Agentic Workflow, scaf
 
 Before designing anything, consult `references/authoring-sources.md`.
 
+If the task depends on local gh-aw commands such as `gh aw init`, `gh aw compile`, `gh aw add-wizard`, `gh aw validate`, `gh aw logs`, `gh aw audit`, or `gh aw mcp inspect`, verify that gh-aw is available before relying on that path. Try `gh aw version` first; if that fails, check `gh extension list` for `github/gh-aw`. If gh-aw is not available, warn the user immediately, do not imply local compile or add-wizard steps were performed, and guide the user with the smallest install step needed.
+
 Use Peli's Agent Factory as the first routing check for workflow requests:
 
 - If the user's requested workflow already exists in the Agent Factory index, start from that ready-to-use workflow source instead of authoring from scratch.
@@ -42,7 +44,7 @@ Route the task first:
 
 1. Treat gh-aw workflows as markdown source files in `.github/workflows/*.md` that compile to `.lock.yml` files.
 2. Keep setup assumptions explicit:
-   - `gh` 2.0.0+ and the `github/gh-aw` extension are the default local authoring path.
+   - `gh` 2.0.0+ and the `github/gh-aw` extension are the default local authoring path; verify gh-aw availability before depending on local CLI flows.
    - The repository needs GitHub Actions enabled and write access for installation and run setup.
    - The chosen engine must have its matching secret configured. Copilot uses `COPILOT_GITHUB_TOKEN`, Claude uses `ANTHROPIC_API_KEY`, and Codex uses `OPENAI_API_KEY`.
    - If the workflow is not using Copilot, adjust `engine:` in frontmatter rather than assuming the default engine is correct.
@@ -65,6 +67,7 @@ Route the task first:
 
 1. Refresh against current docs using `llms.txt` or `llms-full.txt`, then check Peli's Agent Factory for an exact or adjacent workflow before drafting a bespoke design.
 2. Confirm the authoring path:
+   - If the chosen path depends on local gh-aw commands, verify gh-aw availability first and warn immediately if it is missing.
    - Initialized repo for GitHub.com or mobile `/agent agentic-workflows` usage.
    - Coding-agent flow using the upstream `create.md` prompt.
    - Manual editing plus local compile.
