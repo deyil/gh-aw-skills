@@ -23,6 +23,8 @@ Use these sources when editing, debugging, fixing, or upgrading existing gh-aw w
 - GH-AW as MCP server: https://github.github.com/gh-aw/reference/gh-aw-as-mcp-server/
 - Network access: https://github.github.com/gh-aw/reference/network/
 - GitHub read tools: https://github.github.com/gh-aw/reference/github-tools/
+- Staged mode: https://github.github.com/gh-aw/reference/staged-mode/
+- Threat detection: https://github.github.com/gh-aw/reference/threat-detection/
 
 ## Discovery Fallback
 

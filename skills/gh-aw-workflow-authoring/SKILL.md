@@ -44,7 +44,7 @@ Route the task first:
 
 1. Treat gh-aw workflows as markdown source files in `.github/workflows/*.md` that compile to `.lock.yml` files.
 2. Keep setup assumptions explicit:
-   - `gh` 2.0.0+ and the `github/gh-aw` extension are the default local authoring path; verify gh-aw availability before depending on local CLI flows.
+   - The `gh` CLI plus the `github/gh-aw` extension are the default local authoring path; verify gh-aw availability before depending on local CLI flows.
    - The repository needs GitHub Actions enabled and write access for installation and run setup.
    - The chosen engine must have its matching secret configured. Copilot uses `COPILOT_GITHUB_TOKEN`, Claude uses `ANTHROPIC_API_KEY`, and Codex uses `OPENAI_API_KEY`.
    - If the workflow is not using Copilot, adjust `engine:` in frontmatter rather than assuming the default engine is correct.
@@ -55,13 +55,15 @@ Route the task first:
 5. For GitHub API reads, use `tools.github.toolsets`. Do not design workflows around direct access to `api.github.com`.
 6. Prefer minimal frontmatter. Avoid default-only fields unless there is a reason to override them.
 7. Infer network ecosystems from repository language when builds, installs, or tests are involved. Do not rely on `network: defaults` alone for code workflows.
-8. Respect gh-aw's single-job execution model. If the request needs waiting, fan-out orchestration, rollback orchestration, or cross-job state passing, recommend traditional GitHub Actions or a hybrid design.
+8. Respect gh-aw's staged execution model and orchestration boundaries. Prefer supported patterns such as `call-workflow` and `dispatch-workflow` when they fit; if the request needs long waits on external events, unsupported rollback choreography, matrix-style coordination, or arbitrary cross-job state passing, recommend traditional GitHub Actions or a hybrid design.
 9. For command-style workflows, choose deliberately:
    - `slash_command` for conversational, argument-carrying triggers.
    - `label_command` for visible, one-shot UI triggers.
 10. Prefer fuzzy schedules like `daily on weekdays` or `weekly` over fixed cron times when the use case allows it.
-11. In prompts, tell the agent to emit `noop` when it completed the analysis and there is intentionally nothing to do.
-12. When authoring manually, always create and commit the pair together: `.github/workflows/<name>.md` and `.github/workflows/<name>.lock.yml`.
+11. For preview-first rollouts or risky write paths, consider `safe-outputs.staged: true` before enabling real writes.
+12. Reach for newer built-ins instead of ad hoc workarounds when they fit: `mcp-scripts:` for small custom tools, `threat-detection:` for additional output scrutiny, `cache-memory:` or `repo-memory:` for retained context, `qmd:` for local documentation search, and `playwright:` for browser automation.
+13. In prompts, tell the agent to emit `noop` when it completed the analysis and there is intentionally nothing to do.
+14. When authoring manually, always create and commit the pair together: `.github/workflows/<name>.md` and `.github/workflows/<name>.lock.yml`.
 
 ## Workflow Design Process
 
@@ -72,7 +74,7 @@ Route the task first:
    - Coding-agent flow using the upstream `create.md` prompt.
    - Manual editing plus local compile.
 3. If a factory workflow is a fit, identify whether it should be reused mostly as-is or remixed around the user's trigger, write path, repo language, and external systems.
-4. Identify the trigger, GitHub read scope, external systems, write side effects, and repo language.
+4. Identify the trigger, GitHub read scope, external systems, write side effects, repo language, and whether built-ins such as `call-workflow`, `dispatch-workflow`, staged mode, or `threat-detection:` are part of the design.
 5. Draft the smallest frontmatter that satisfies the use case.
 6. Draft a prompt body that is explicit about task, constraints, and safe outputs.
 7. Compile after frontmatter changes and fix all validation errors before stopping.
@@ -82,9 +84,13 @@ Route the task first:
 
 - Community-facing issue triage: consider `on.roles: all`, `tools.github.toolsets: [default]`, safe outputs for comments and labels, and sanitized context text.
 - Daily improvers or reporters: prefer fuzzy weekday scheduling, `skip-if-match` to avoid duplicates, and `close-older-*` options for recurring outputs.
+- Same-repo orchestration: prefer `call-workflow` for typed same-run worker selection and `dispatch-workflow` for asynchronous same-repo follow-up work before inventing bespoke orchestration.
 - Shared components: keep them focused, prefer containerized MCP servers, keep read-only tool allowlists tight, and document source links in XML comments or reference material.
+- Preview-first rollouts: enable staged mode while validating prompts and safe outputs, then remove it when the workflow is ready to write for real.
+- Richer context and browser work: consider `qmd:`, `cache-memory:`, `repo-memory:`, or `playwright:` when the workflow needs local docs search, historical context, or controlled browser interaction.
 - Prompt-only refinements: update the markdown body only and do not force a needless recompile.
 - Quickstart bootstrap requests: prefer `gh aw add-wizard` when the user wants a proven example to customize, then edit the markdown body before touching frontmatter.
+- Repeated analysis or reporting: consider `cache-memory:` or `repo-memory:` when historical context materially improves the workflow's decisions.
 - Factory-first requests: when the ask maps cleanly to a factory workflow such as triage, PR review, documentation upkeep, fault investigation, or analytics, adapt the existing upstream workflow before inventing a new one.
 
 ## Deliverables

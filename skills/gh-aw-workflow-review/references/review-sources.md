@@ -22,6 +22,9 @@ Use these sources to ground review comments in actual gh-aw behavior.
 - Network reference: https://github.github.com/gh-aw/reference/network/
 - Imports reference: https://github.github.com/gh-aw/reference/imports/
 - Debugging: https://github.github.com/gh-aw/troubleshooting/debugging/
+- Staged mode: https://github.github.com/gh-aw/reference/staged-mode/
+- Threat detection: https://github.github.com/gh-aw/reference/threat-detection/
+- GH-AW as MCP server: https://github.github.com/gh-aw/reference/gh-aw-as-mcp-server/
 
 ## Discovery Fallback
 
@@ -30,7 +33,7 @@ Use these sources to ground review comments in actual gh-aw behavior.
 
 ## Review Heuristics
 
-- Check whether the proposal is actually compatible with single-job agent execution.
+- Check whether the proposal is actually compatible with gh-aw's staged execution model and supported orchestration patterns.
 - Prefer explicit gh-aw references over generic GitHub Actions intuition.
 - When a ready-to-use factory workflow exists for the same job, review whether the bespoke design is materially better or just more complex.
 - Use the sitemap and llms endpoints when you suspect the docs have moved or a newer page exists.

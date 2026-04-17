@@ -18,7 +18,7 @@ When the workflow request resembles something already covered by Peli's Agent Fa
 
 ## Example Prompts
 
-- "Review this gh-aw workflow for unsafe writes, missing safe outputs, and single-job model issues."
+- "Review this gh-aw workflow for unsafe writes, missing safe outputs, and staged-execution design issues."
 - "Audit the workflow source and lock pair for compile, guardrail, and operability problems."
 - "Check whether this workflow design fits gh-aw or should be split into traditional GitHub Actions."
 - "Review whether this bespoke workflow should have started from an existing Agent Factory workflow instead of reinventing the pattern."
@@ -29,9 +29,9 @@ Review workflows against these categories.
 
 ### 1. Architectural Fit
 
-- Does the requested behavior fit gh-aw's single-job model?
-- Is the design trying to wait on external events, coordinate multi-stage pipelines, or move state between jobs in a way gh-aw does not support?
-- Should the solution be split into simpler gh-aw units or moved to traditional GitHub Actions?
+- Does the requested behavior fit gh-aw's staged execution model and safe-output boundaries?
+- Is the design ignoring built-in orchestration features such as `call-workflow` or `dispatch-workflow`, or trying to wait on external events, coordinate unsupported matrix-style behavior, or move arbitrary state between jobs in a way gh-aw does not support?
+- Should the solution use built-in gh-aw orchestration, be split into simpler gh-aw units, or move to traditional GitHub Actions?
 
 ### 2. Setup And Bootstrap Correctness
 
@@ -54,6 +54,7 @@ Review workflows against these categories.
 - Are the source `.md` and compiled `.lock.yml` treated as a pair?
 - Is the workflow structure valid for gh-aw frontmatter and markdown semantics?
 - Are GitHub reads modeled with `tools.github.toolsets` rather than mutation tools or direct API assumptions?
+- Are newer built-ins used deliberately where they fit, such as `mcp-scripts:`, `threat-detection:`, staged mode, `cache-memory:` or `repo-memory:`, and workflow-call or dispatch safe outputs, instead of bespoke workarounds?
 - Are MCP servers configured appropriately, with read-only allowlists where possible?
 - Are shared components scoped narrowly and imported cleanly?
 
@@ -62,6 +63,8 @@ Review workflows against these categories.
 - Can the workflow be compiled and validated cleanly?
 - If it depends on `agentic-workflows:` introspection tools, does it have `actions: read`?
 - Does the prompt tell the agent what to do when no action is needed, typically via `noop`?
+- If orchestration safe outputs are used, are target workflows allowlisted and compatible with `workflow_call` or `workflow_dispatch` as required?
+- If staged mode is enabled, is preview-only behavior intentional and documented?
 - Are schedules, rate limits, skip rules, or duplicate-prevention settings appropriate?
 - Is there a realistic debugging path using `logs`, `audit`, `mcp inspect`, or `health`?
 - Are first-run prerequisites covered, including Actions enablement and engine-secret setup?
@@ -98,7 +101,7 @@ Review workflows against these categories.
 - A bespoke workflow that duplicates a ready-to-use factory workflow without a repository-specific reason.
 - A workflow that assumes GitHub.com or mobile authoring support without repository initialization.
 - An engine/secret mismatch that guarantees first-run failure.
-- Use of unsupported orchestration patterns.
+- Unsupported orchestration patterns, or a bespoke orchestration design where built-in `call-workflow` or `dispatch-workflow` would fit.
 - Missing `actions: read` for workflow-introspection tooling.
 - GitHub mutation operations modeled as tools instead of safe outputs.
 - Prompt instructions that omit safe no-op behavior for successful no-action runs.

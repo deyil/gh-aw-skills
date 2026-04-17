@@ -44,7 +44,7 @@ Then classify the work:
 4. If the change touches frontmatter, compile and fix all resulting validation errors before stopping.
 5. Prefer strict validation and secure defaults over relaxing guardrails.
 6. Keep GitHub writes inside `safe-outputs:`. Do not add direct write permissions to the agent job.
-7. Use `toolsets:` for GitHub tools. Do not reintroduce unsupported or deprecated patterns such as `mode: remote` for GitHub tools in normal workflow designs.
+7. Use `toolsets:` for GitHub tools. Preserve supported GitHub-tool configuration and do not reintroduce deprecated, undocumented, or bespoke mutation patterns in place of normal gh-aw reads plus safe outputs.
 8. When runs fail immediately in a fresh repository, check setup first:
    - Missing engine secret
    - Wrong `engine:` value for the configured secret
@@ -78,7 +78,10 @@ Then classify the work:
 3. Check for:
    - Missing tools
    - Safe-output mismatches
+   - Staged-mode previews that were mistaken for real writes
+   - `call-workflow` or `dispatch-workflow` allowlist and trigger mismatches
    - Network/firewall denials
+   - Threat-detection verdicts or over-broad detection customizations
    - MCP startup failures
    - Permission or auth failures
    - Missing repository initialization for the intended authoring mode
@@ -114,7 +117,11 @@ If the CLI is unavailable or unauthenticated in the execution environment, use t
 
 - Missing tool calls: correct the tool name in the prompt, or enable the missing tool/safe output in frontmatter.
 - Firewall denials: add the right ecosystem or domain to `network.allowed`, keeping it minimal.
+- Orchestration failures: verify `call-workflow` or `dispatch-workflow` targets, allowlists, and required `workflow_call` or `workflow_dispatch` triggers.
 - Safe-output failures: fix the `safe-outputs:` block rather than adding write permissions.
+- Threat-detection failures: inspect `threat-detection:` prompts or scanner steps before weakening permissions or output controls.
+- Preview-only surprises: check whether global or per-output `staged: true` is still enabled.
+- Missing newer built-ins: prefer `mcp-scripts:`, `cache-memory:`, `repo-memory:`, `qmd:`, or `playwright:` when the workflow is re-implementing those capabilities by hand.
 - Compile errors: run fixers first, then address schema errors precisely.
 - High token use: shorten prompts, prefetch deterministic data, or add cache-memory where repeated analysis is expected.
 - Quickstart customization regressions: if a user edited frontmatter on a sample workflow and skipped `gh aw compile`, regenerate the lock file before chasing deeper runtime issues.

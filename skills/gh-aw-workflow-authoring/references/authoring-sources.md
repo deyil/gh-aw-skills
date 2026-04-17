@@ -24,6 +24,9 @@ Use these sources in roughly this order when creating or substantially redesigni
 - Imports reference: https://github.github.com/gh-aw/reference/imports/
 - Compilation process: https://github.github.com/gh-aw/reference/compilation-process/
 - Safe outputs reference: https://github.github.com/gh-aw/reference/safe-outputs/
+- Staged mode: https://github.github.com/gh-aw/reference/staged-mode/
+- Threat detection: https://github.github.com/gh-aw/reference/threat-detection/
+- GH-AW as MCP server: https://github.github.com/gh-aw/reference/gh-aw-as-mcp-server/
 
 ## Raw Prompts
 
