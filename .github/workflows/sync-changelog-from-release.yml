@@ -172,7 +172,8 @@ jobs:
           set -euo pipefail
 
           body_file=''
-          trap 'if [[ -n "$body_file" ]]; then rm -f "$body_file"; fi' EXIT
+          error_file=''
+          trap 'if [[ -n "$body_file" ]]; then rm -f "$body_file"; fi; if [[ -n "$error_file" ]]; then rm -f "$error_file"; fi' EXIT
 
           if ! existing_pr="$(gh pr list --head "$BRANCH_NAME" --state open --json number --jq '.[0].number // empty')"; then
             echo "Failed to query existing pull requests for $BRANCH_NAME." >&2
@@ -196,11 +197,21 @@ jobs:
           - workflow generated from release event or workflow_dispatch
           EOF
 
-          pr_url="$(gh pr create \
+          error_file="$(mktemp)"
+          if ! pr_url="$(gh pr create \
             --base "$DEFAULT_BRANCH" \
             --head "$BRANCH_NAME" \
             --title "docs: update changelog for $TAG" \
-            --body-file "$body_file")"
+            --body-file "$body_file" 2>"$error_file")"; then
+            if grep -q 'GitHub Actions is not permitted to create or approve pull requests' "$error_file"; then
+              echo 'Pull request creation is blocked for the default GitHub Actions token.' >&2
+              echo 'Enable Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests,' >&2
+              echo 'or add a CHANGELOG_PR_TOKEN secret with permission to open pull requests.' >&2
+            fi
+
+            cat "$error_file" >&2
+            exit 1
+          fi
 
           echo "pr_url=$pr_url" >> "$GITHUB_ENV"
 
