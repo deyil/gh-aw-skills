@@ -41,7 +41,7 @@ Then classify the work:
 1. Make small, surgical changes. Do not rewrite frontmatter unless the change truly requires it.
 2. Preserve existing patterns unless the task is explicitly a refactor or upgrade.
 3. If the change only touches the markdown body, do not force recompilation.
-4. If the change touches frontmatter, compile and fix all resulting validation errors before stopping.
+4. If the change touches frontmatter, recompile the gh-aw markdown source, then run `actionlint` against the generated `.lock.yml` when it is available, and fix all resulting validation errors before stopping.
 5. Prefer strict validation and secure defaults over relaxing guardrails.
 6. Keep GitHub writes inside `safe-outputs:`. Do not add direct write permissions to the agent job.
 7. Use `toolsets:` for GitHub tools. Preserve supported GitHub-tool configuration and do not reintroduce deprecated, undocumented, or bespoke mutation patterns in place of normal gh-aw reads plus safe outputs.
@@ -60,8 +60,9 @@ Then classify the work:
 1. Read the current workflow and decide whether the change is body-only or frontmatter.
 2. For body-only edits, update the prompt and stop there unless the user asked for validation.
 3. For frontmatter edits, change the smallest possible YAML surface.
-4. Recompile and validate. Prefer `gh aw compile --strict` or `gh aw validate` when available.
-5. If the user started from a quickstart sample such as `gh aw add-wizard`, preserve the sample's working setup unless the requested behavior requires a deliberate config change.
+4. Recompile the workflow source and validate the generated workflow. Prefer `gh aw compile --strict` or `gh aw validate` when available.
+5. Run `actionlint` against the generated `.github/workflows/<name>.lock.yml` when it is available.
+6. If the user started from a quickstart sample such as `gh aw add-wizard`, preserve the sample's working setup unless the requested behavior requires a deliberate config change.
 
 ### Factory-Derived Updates
 
@@ -69,7 +70,8 @@ Then classify the work:
 2. Compare the current repository workflow against that upstream source before changing anything.
 3. Reuse the exact upstream structure only when the user's requested behavior truly matches it.
 4. If the fit is partial, borrow the smallest useful prompt or frontmatter patterns and preserve local requirements that the factory workflow does not model.
-5. Compile after frontmatter changes and verify the adapted workflow still matches the repository's engine, secrets, permissions, and triggers.
+5. Recompile the workflow source after frontmatter changes, then run `actionlint` against the generated `.lock.yml` when it is available.
+6. Verify the adapted workflow still matches the repository's engine, secrets, permissions, and triggers.
 
 ### Debugging Failures
 
@@ -88,7 +90,7 @@ Then classify the work:
    - Missing or mismatched engine secrets
    - Excessive token usage or long runtimes
 4. If the problem is tool availability, compare the requested tool name against configured `tools:` and `safe-outputs:` names.
-5. Validate the fix with compile before closing the loop.
+5. Validate the fix by recompiling the source, then run `actionlint` against the generated `.lock.yml` when it is available, before closing the loop.
 
 ### Upgrades And Deprecations
 
@@ -103,6 +105,7 @@ Then classify the work:
 - `gh aw compile <workflow>`
 - `gh aw compile <workflow> --strict`
 - `gh aw validate <workflow> --json`
+- `actionlint .github/workflows/<name>.lock.yml`
 - `gh aw fix --write`
 - `gh aw update`
 - `gh aw upgrade`

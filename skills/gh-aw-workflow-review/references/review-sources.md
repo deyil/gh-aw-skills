@@ -18,6 +18,7 @@ Use these sources to ground review comments in actual gh-aw behavior.
 
 ## Use When Needed
 
+- Actionlint usage: https://github.com/rhysd/actionlint/blob/main/docs/usage.md
 - GitHub tools reference: https://github.github.com/gh-aw/reference/github-tools/
 - Network reference: https://github.github.com/gh-aw/reference/network/
 - Imports reference: https://github.github.com/gh-aw/reference/imports/

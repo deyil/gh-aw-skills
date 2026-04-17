@@ -19,6 +19,7 @@ Use these sources in roughly this order when creating or substantially redesigni
 ## Use When Needed
 
 - Agentic authoring guide: https://github.github.com/gh-aw/guides/agentic-authoring/
+- Actionlint usage: https://github.com/rhysd/actionlint/blob/main/docs/usage.md
 - GitHub read tools: https://github.github.com/gh-aw/reference/github-tools/
 - Network access: https://github.github.com/gh-aw/reference/network/
 - Imports reference: https://github.github.com/gh-aw/reference/imports/

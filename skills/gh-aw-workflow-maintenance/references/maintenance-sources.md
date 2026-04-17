@@ -19,6 +19,7 @@ Use these sources when editing, debugging, fixing, or upgrading existing gh-aw w
 ## Use When Needed
 
 - Compilation process: https://github.github.com/gh-aw/reference/compilation-process/
+- Actionlint usage: https://github.com/rhysd/actionlint/blob/main/docs/usage.md
 - Releases and versioning: https://github.github.com/gh-aw/reference/releases/
 - GH-AW as MCP server: https://github.github.com/gh-aw/reference/gh-aw-as-mcp-server/
 - Network access: https://github.github.com/gh-aw/reference/network/

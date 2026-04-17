@@ -64,6 +64,7 @@ Route the task first:
 12. Reach for newer built-ins instead of ad hoc workarounds when they fit: `mcp-scripts:` for small custom tools, `threat-detection:` for additional output scrutiny, `cache-memory:` or `repo-memory:` for retained context, `qmd:` for local documentation search, and `playwright:` for browser automation.
 13. In prompts, tell the agent to emit `noop` when it completed the analysis and there is intentionally nothing to do.
 14. When authoring manually, always create and commit the pair together: `.github/workflows/<name>.md` and `.github/workflows/<name>.lock.yml`.
+15. When frontmatter changes require recompilation, recompile the gh-aw markdown source first. Then run `actionlint` against the generated `.lock.yml` when it is available. Do not run it against the gh-aw markdown source, and say explicitly if `actionlint` was not available.
 
 ## Workflow Design Process
 
@@ -77,8 +78,9 @@ Route the task first:
 4. Identify the trigger, GitHub read scope, external systems, write side effects, repo language, and whether built-ins such as `call-workflow`, `dispatch-workflow`, staged mode, or `threat-detection:` are part of the design.
 5. Draft the smallest frontmatter that satisfies the use case.
 6. Draft a prompt body that is explicit about task, constraints, and safe outputs.
-7. Compile after frontmatter changes and fix all validation errors before stopping.
-8. Tell the user how to trigger the first run, typically from the Actions tab or `gh aw run <workflow-name>`.
+7. Recompile the workflow source after frontmatter changes and fix all gh-aw validation errors before stopping.
+8. Run `actionlint` against the generated `.github/workflows/<name>.lock.yml` when it is available, and fix any resulting workflow-YAML errors in the source before stopping.
+9. Tell the user how to trigger the first run, typically from the Actions tab or `gh aw run <workflow-name>`.
 
 ## Common Patterns
 
@@ -99,3 +101,4 @@ Route the task first:
 - Up-to-date links back to the authoritative gh-aw docs and raw prompt files.
 - If the workflow came from Peli's Agent Factory, state whether it was an exact-match reuse or an inspired-by adaptation.
 - Clear distinction between changes that need recompilation and those that do not.
+- Clear statement of whether compile validation and `actionlint` verification were run, skipped, or blocked.

@@ -61,6 +61,7 @@ Review workflows against these categories.
 ### 5. Operability
 
 - Can the workflow be compiled and validated cleanly?
+- After the source is recompiled, does `actionlint` pass on the generated `.lock.yml` or any handwritten workflow `.yml` files in `.github/workflows/`?
 - If it depends on `agentic-workflows:` introspection tools, does it have `actions: read`?
 - Does the prompt tell the agent what to do when no action is needed, typically via `noop`?
 - If orchestration safe outputs are used, are target workflows allowlisted and compatible with `workflow_call` or `workflow_dispatch` as required?
@@ -81,6 +82,7 @@ Review workflows against these categories.
 - The current `.md` workflow file and corresponding `.lock.yml`.
 - The closest matching workflow or category from Peli's Agent Factory, when the requested behavior already exists there.
 - `gh aw compile --strict` or `gh aw validate` results when available.
+- `actionlint` results for the generated `.lock.yml` or handwritten workflow YAML, when available.
 - `gh aw audit` and `gh aw logs` output for behavior-based findings.
 - `gh aw mcp inspect` output for MCP and tool configuration findings.
 - The authoritative docs pages listed in the references file.
@@ -98,6 +100,7 @@ Review workflows against these categories.
 - Direct write permissions on the agent job.
 - Broad or implicit network access.
 - A workflow markdown file without its compiled `.lock.yml`, or a stale lock file after frontmatter changes.
+- A workflow whose source recompiles cleanly but whose generated `.lock.yml` still fails `actionlint`.
 - A bespoke workflow that duplicates a ready-to-use factory workflow without a repository-specific reason.
 - A workflow that assumes GitHub.com or mobile authoring support without repository initialization.
 - An engine/secret mismatch that guarantees first-run failure.
