@@ -119,6 +119,59 @@ jobs:
 
           gh release create "${release_args[@]}"
 
+      - name: Append full commit list to release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.previous_release.outputs.resolved_tag }}
+          PREVIOUS_TAG: ${{ steps.previous_release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            commit_range="$PREVIOUS_TAG..$TAG"
+            range_label="$PREVIOUS_TAG...$TAG"
+          else
+            commit_range="$TAG"
+            range_label="$TAG"
+          fi
+
+          notes_file="$(mktemp)"
+          trap 'rm -f "$notes_file"' EXIT
+
+          gh release view "$TAG" --json body --jq '.body' > "$notes_file"
+
+          {
+            echo
+            echo "## Full Commit List"
+            echo
+            echo "Range: $range_label"
+            echo
+          } >> "$notes_file"
+
+          commit_count=0
+          while IFS=$'\t' read -r commit_sha commit_subject; do
+            if [[ -z "$commit_sha" ]]; then
+              continue
+            fi
+
+            commit_count=$((commit_count + 1))
+            short_sha="$(git rev-parse --short "$commit_sha")"
+            printf -- '- %s ([`%s`](%s/%s/commit/%s))\n' \
+              "$commit_subject" \
+              "$short_sha" \
+              "$GITHUB_SERVER_URL" \
+              "$GITHUB_REPOSITORY" \
+              "$commit_sha" >> "$notes_file"
+          done < <(git log --reverse --format='%H%x09%s' "$commit_range")
+
+          if [[ "$commit_count" -eq 0 ]]; then
+            echo "- No commits found for this release range." >> "$notes_file"
+          fi
+
+          gh release edit "$TAG" --notes-file "$notes_file"
+
       - name: Trigger changelog sync workflow
         if: inputs.draft == false
         env:
