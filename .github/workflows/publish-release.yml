@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          previous_tag="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --slurp --jq 'map(.[]) | map(select(.draft == false)) | .[0].tag_name // ""')"
+          previous_tag="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -s -r 'map(.[]) | map(select(.draft == false)) | .[0].tag_name // ""')"
           echo "tag=${previous_tag}" >> "$GITHUB_OUTPUT"
 
           if [[ -n "$INPUT_TAG" ]]; then
