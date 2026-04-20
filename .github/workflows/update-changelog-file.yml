@@ -1,4 +1,4 @@
-name: Sync Changelog From Release
+name: Update CHANGELOG.md
 
 on:
   workflow_call:
