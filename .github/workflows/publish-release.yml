@@ -14,7 +14,7 @@ on:
         default: ""
         type: string
       target:
-        description: Branch to target for the release. Defaults to main.
+        description: Branch to target for the release. Must be an existing branch for published releases so changelog sync can push back to it. Defaults to main.
         required: false
         default: main
         type: string
@@ -102,6 +102,105 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate target branch
+        if: inputs.draft == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+
+          encoded_target="$(jq -rn --arg target "$TARGET" "\$target|@uri")"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/branches/${encoded_target}" >/dev/null 2>&1; then
+            echo "Target must be an existing branch name for published releases: $TARGET" >&2
+            exit 1
+          fi
+
+      - name: Check out target history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.target }}
+
+      - name: Assemble release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.resolved_tag }}
+          TARGET: ${{ inputs.target }}
+          PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+        run: |
+          set -euo pipefail
+
+          generate_args="$(jq -n \
+            --arg tag_name "$TAG" \
+            --arg target_commitish "$TARGET" \
+            --arg previous_tag "$PREVIOUS_TAG" \
+            "if \$previous_tag != \"\" then {tag_name: \$tag_name, target_commitish: \$target_commitish, previous_tag_name: \$previous_tag} else {tag_name: \$tag_name, target_commitish: \$target_commitish} end"
+          )"
+
+          generated_body="$(printf "%s" "$generate_args" | gh api --method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" --input - --jq '.body')"
+          if [[ -z "$generated_body" ]]; then
+            generated_body="- No release notes were provided for this release."
+          fi
+
+          commit_section="$(mktemp)"
+          cleanup_commit_section() {
+            rm -f "$commit_section"
+          }
+          trap cleanup_commit_section EXIT
+
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            commit_range="${PREVIOUS_TAG}..HEAD"
+            range_label="${PREVIOUS_TAG}...${TAG}"
+          else
+            commit_range=""
+            range_label="initial release"
+          fi
+
+          {
+            echo
+            echo "## Full Commit List"
+            echo
+            echo "Range: $range_label"
+            echo
+          } > "$commit_section"
+
+          commit_count=0
+          if [[ -n "$commit_range" ]]; then
+            while IFS=$'\t' read -r sha subject; do
+              [[ -z "$sha" ]] && continue
+              commit_count=$((commit_count + 1))
+              short="$(git rev-parse --short "$sha")"
+              printf -- "- %s ([\`%s\`](https://github.com/%s/commit/%s))\n" \
+                "$subject" "$short" "$GITHUB_REPOSITORY" "$sha" >> "$commit_section"
+            done < <(git log --reverse --format='%H%x09%s' "$commit_range")
+          else
+            echo "- Initial release; full commit history omitted." >> "$commit_section"
+          fi
+
+          if [[ -n "$commit_range" && "$commit_count" -eq 0 ]]; then
+            echo "- No commits found for this release range." >> "$commit_section"
+          fi
+
+          {
+            echo
+            echo "---"
+            if [[ -n "$PREVIOUS_TAG" ]]; then
+              printf '[Compare changes](https://github.com/%s/compare/%s...%s) | ' \
+                "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$TAG"
+            fi
+            printf '[Release page](https://github.com/%s/releases/tag/%s)\n' "$GITHUB_REPOSITORY" "$TAG"
+          } >> "$commit_section"
+
+          release_body="${generated_body}"$'\n'"$(cat "$commit_section")"
+          body_delimiter="body-$(uuidgen)"
+          {
+            echo "release_body<<$body_delimiter"
+            printf '%s\n' "$release_body"
+            echo "$body_delimiter"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -110,6 +209,7 @@ jobs:
           TARGET: ${{ inputs.target }}
           PRERELEASE: ${{ inputs.prerelease }}
           DRAFT: ${{ inputs.draft }}
+          RELEASE_BODY: ${{ steps.notes.outputs.release_body }}
         run: |
           set -euo pipefail
 
@@ -117,8 +217,15 @@ jobs:
             "$TAG"
             --title "$RELEASE_TITLE"
             --target "$TARGET"
-            --generate-notes
           )
+
+          notes_file="$(mktemp)"
+          cleanup_notes_file() {
+            rm -f "$notes_file"
+          }
+          trap cleanup_notes_file EXIT
+          printf '%s\n' "$RELEASE_BODY" > "$notes_file"
+          release_args+=(--notes-file "$notes_file")
 
           if [[ "$PRERELEASE" == "true" ]]; then
             release_args+=(--prerelease)

@@ -64,20 +64,12 @@ jobs:
           body="$(echo "$latest" | jq -r '.body // ""')"
           prerelease="$(echo "$latest" | jq -r '.prerelease')"
 
-          previous_tag="$(echo "$releases" | jq -r --arg t "$tag" '
-            (to_entries | map(select(.value.tag_name == $t)) | .[0].key) as $idx |
-            if $idx == null then ""
-            elif ($idx + 1) < length then .[$idx + 1].tag_name
-            else "" end
-          ')"
-
           {
             echo "tag=$tag"
             echo "name=$name"
             echo "url=$url"
             echo "published_at=$published_at"
             echo "prerelease=$prerelease"
-            echo "previous_tag=$previous_tag"
           } >> "$GITHUB_OUTPUT"
 
           body_delimiter="body-$(uuidgen)"
@@ -100,7 +92,6 @@ jobs:
           PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
           BODY: ${{ steps.release.outputs.body }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
-          PREVIOUS_TAG: ${{ steps.release.outputs.previous_tag }}
         run: |
           set -euo pipefail
 
@@ -131,57 +122,6 @@ jobs:
             heading="## [$release_title]($URL) - $release_date"
           fi
 
-          # --- Full Commit List ---
-          commit_section="$(mktemp)"
-          trap 'rm -f "$commit_section"' EXIT
-
-          if [[ -n "$PREVIOUS_TAG" ]]; then
-            commit_range="${PREVIOUS_TAG}..${TAG}"
-            range_label="${PREVIOUS_TAG}...${TAG}"
-          else
-            commit_range=""
-            range_label="initial release"
-          fi
-
-          {
-            echo
-            echo "## Full Commit List"
-            echo
-            echo "Range: $range_label"
-            echo
-          } > "$commit_section"
-
-          commit_count=0
-          if [[ -n "$commit_range" ]]; then
-            while IFS=$'\t' read -r sha subject; do
-              [[ -z "$sha" ]] && continue
-              commit_count=$((commit_count + 1))
-              short="$(git rev-parse --short "$sha")"
-              printf -- '- %s ([`%s`](https://github.com/%s/commit/%s))\n' \
-                "$subject" "$short" "$GITHUB_REPOSITORY" "$sha" >> "$commit_section"
-            done < <(git log --reverse --format='%H%x09%s' "$commit_range")
-          else
-            echo "- Initial release; full commit history omitted." >> "$commit_section"
-          fi
-
-          if [[ -n "$commit_range" && "$commit_count" -eq 0 ]]; then
-            echo "- No commits found for this release range." >> "$commit_section"
-          fi
-
-          # --- Footer ---
-          {
-            echo
-            echo "---"
-            if [[ -n "$PREVIOUS_TAG" ]]; then
-              printf '[Compare changes](https://github.com/%s/compare/%s...%s) | ' \
-                "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$TAG"
-            fi
-            printf '[Release page](%s)\n' "$URL"
-          } >> "$commit_section"
-
-          # --- Assemble CHANGELOG.md ---
-          entry_body="${BODY}"$'\n'"$(cat "$commit_section")"
-
           tmp_file="$(mktemp)"
           {
             echo "# Changelog"
@@ -192,7 +132,7 @@ jobs:
             echo
             echo "$heading"
             echo
-            printf '%s\n' "$entry_body"
+            printf '%s\n' "$BODY"
             echo
             if [[ -f CHANGELOG.md ]]; then
               sed -n '/^## /,$p' CHANGELOG.md
