@@ -14,7 +14,7 @@ on:
         default: ""
         type: string
       target:
-        description: Branch to target for the release. Must be a branch name (not a SHA) for non-draft releases so the changelog commit can be pushed. Defaults to main.
+        description: Branch to target for the release. Defaults to main.
         required: false
         default: main
         type: string
@@ -96,24 +96,9 @@ jobs:
           fi
           echo "release_title=${release_title}" >> "$GITHUB_OUTPUT"
 
-  update-changelog:
-    name: Update changelog
-    needs: prepare
-    if: inputs.draft == false
-    uses: ./.github/workflows/update-changelog-file.yml
-    with:
-      tag: ${{ needs.prepare.outputs.resolved_tag }}
-      generate_from_head: true
-      target: ${{ inputs.target }}
-      prerelease: ${{ inputs.prerelease }}
-    secrets: inherit
-
   publish:
     name: Publish GitHub release
-    needs:
-      - prepare
-      - update-changelog
-    if: always() && needs.prepare.result == 'success' && (needs.update-changelog.result == 'success' || needs.update-changelog.result == 'skipped')
+    needs: prepare
     runs-on: ubuntu-latest
 
     steps:
@@ -125,32 +110,15 @@ jobs:
           TARGET: ${{ inputs.target }}
           PRERELEASE: ${{ inputs.prerelease }}
           DRAFT: ${{ inputs.draft }}
-          COMMIT_SHA: ${{ needs.update-changelog.outputs.commit_sha }}
-          RELEASE_BODY: ${{ needs.update-changelog.outputs.release_body }}
         run: |
           set -euo pipefail
-
-          # Prefer the changelog-sync commit when available so release and changelog align.
-          if [[ -n "$COMMIT_SHA" ]]; then
-            target_sha="$COMMIT_SHA"
-          else
-            target_sha="$TARGET"
-          fi
 
           release_args=(
             "$TAG"
             --title "$RELEASE_TITLE"
-            --target "$target_sha"
+            --target "$TARGET"
+            --generate-notes
           )
-
-          if [[ -n "$RELEASE_BODY" ]]; then
-            notes_file="$(mktemp)"
-            trap 'rm -f "$notes_file"' EXIT
-            printf '%s\n' "$RELEASE_BODY" > "$notes_file"
-            release_args+=(--notes-file "$notes_file")
-          else
-            release_args+=(--generate-notes)
-          fi
 
           if [[ "$PRERELEASE" == "true" ]]; then
             release_args+=(--prerelease)
