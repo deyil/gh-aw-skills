@@ -100,7 +100,7 @@ jobs:
     name: Update changelog
     needs: prepare
     if: inputs.draft == false
-    uses: ./.github/workflows/sync-changelog-from-release.yml
+    uses: ./.github/workflows/update-changelog-file.yml
     with:
       tag: ${{ needs.prepare.outputs.resolved_tag }}
       generate_from_head: true

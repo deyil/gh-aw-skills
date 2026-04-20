@@ -35,8 +35,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to sync to changelog
-        required: true
+        description: Release tag to sync to changelog. Leave blank to auto-increment from the latest release when generating from HEAD.
+        required: false
+        default: ""
         type: string
       generate_from_head:
         description: Generate release notes from HEAD instead of from the tag ref
@@ -110,8 +111,30 @@ jobs:
           }
           trap cleanup EXIT
 
+          previous_tag=""
+
+          if [[ -z "$TAG" && "${GENERATE_FROM_HEAD:-false}" == "true" ]]; then
+            previous_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -r 'map(select(.draft == false)) | .[0].tag_name // ""')"
+
+            if [[ -z "$previous_tag" ]]; then
+              echo "Release tag is required when no previous release exists to auto-increment from." >&2
+              exit 1
+            fi
+
+            if [[ "$previous_tag" =~ ^(v)?([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              tag_prefix="${BASH_REMATCH[1]}"
+              major="${BASH_REMATCH[2]}"
+              minor="${BASH_REMATCH[3]}"
+              TAG="${tag_prefix}${major}.$((minor + 1)).0"
+            else
+              echo "Cannot auto-increment from previous release tag: $previous_tag" >&2
+              echo "Supported format is v<major>.<minor>.<patch> or <major>.<minor>.<patch>. Provide an explicit tag input." >&2
+              exit 1
+            fi
+          fi
+
           if [[ -z "$TAG" ]]; then
-            echo "Release tag is required." >&2
+            echo "Release tag is required unless generate_from_head is enabled." >&2
             exit 1
           fi
 
@@ -127,7 +150,6 @@ jobs:
           BODY="${BODY:-}"
           PRERELEASE="${PRERELEASE:-false}"
 
-          previous_tag=""
           commit_target=""
           append_full_commit_list="false"
 
@@ -154,7 +176,9 @@ jobs:
               fi
 
               # Path 3: release does not exist yet; generate notes from HEAD or tag.
-              previous_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -r 'map(select(.draft == false)) | .[0].tag_name // ""')"
+              if [[ -z "$previous_tag" ]]; then
+                previous_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -r 'map(select(.draft == false)) | .[0].tag_name // ""')"
+              fi
 
               if [[ "${GENERATE_FROM_HEAD:-false}" == "true" ]]; then
                 commit_target="HEAD"
