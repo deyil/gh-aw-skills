@@ -14,7 +14,7 @@ on:
         default: ""
         type: string
       target:
-        description: Branch or commit to tag when the tag does not already exist.
+        description: Branch to target for the release. Must be a branch name (not a SHA) for non-draft releases so the changelog commit can be pushed. Defaults to main.
         required: false
         default: main
         type: string
@@ -30,7 +30,6 @@ on:
         type: boolean
 
 permissions:
-  actions: write
   contents: write
 
 concurrency:
@@ -38,9 +37,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish GitHub release
+  prepare:
+    name: Resolve release tag
     runs-on: ubuntu-latest
+    outputs:
+      resolved_tag: ${{ steps.resolve.outputs.resolved_tag }}
+      previous_tag: ${{ steps.resolve.outputs.previous_tag }}
+      release_title: ${{ steps.resolve.outputs.release_title }}
 
     steps:
       - name: Check out repository history
@@ -48,16 +51,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Capture previous release
-        id: previous_release
+      - name: Resolve tag and title
+        id: resolve
         env:
           GH_TOKEN: ${{ github.token }}
           INPUT_TAG: ${{ inputs.tag }}
+          TITLE: ${{ inputs.title }}
         run: |
           set -euo pipefail
 
           previous_tag="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -s -r 'map(.[]) | map(select(.draft == false)) | .[0].tag_name // ""')"
-          echo "tag=${previous_tag}" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=${previous_tag}" >> "$GITHUB_OUTPUT"
 
           if [[ -n "$INPUT_TAG" ]]; then
             resolved_tag="$INPUT_TAG"
@@ -85,29 +89,68 @@ jobs:
 
           echo "resolved_tag=${resolved_tag}" >> "$GITHUB_OUTPUT"
 
-      - name: Create release with generated notes
+          if [[ -n "$TITLE" ]]; then
+            release_title="$TITLE $resolved_tag"
+          else
+            release_title="$resolved_tag"
+          fi
+          echo "release_title=${release_title}" >> "$GITHUB_OUTPUT"
+
+  update-changelog:
+    name: Update changelog
+    needs: prepare
+    if: inputs.draft == false
+    uses: ./.github/workflows/sync-changelog-from-release.yml
+    with:
+      tag: ${{ needs.prepare.outputs.resolved_tag }}
+      generate_from_head: true
+      target: ${{ inputs.target }}
+      prerelease: ${{ inputs.prerelease }}
+    secrets: inherit
+
+  publish:
+    name: Publish GitHub release
+    needs:
+      - prepare
+      - update-changelog
+    if: always() && needs.prepare.result == 'success' && (needs.update-changelog.result == 'success' || needs.update-changelog.result == 'skipped')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.previous_release.outputs.resolved_tag }}
-          TITLE: ${{ inputs.title }}
+          TAG: ${{ needs.prepare.outputs.resolved_tag }}
+          RELEASE_TITLE: ${{ needs.prepare.outputs.release_title }}
           TARGET: ${{ inputs.target }}
           PRERELEASE: ${{ inputs.prerelease }}
           DRAFT: ${{ inputs.draft }}
+          COMMIT_SHA: ${{ needs.update-changelog.outputs.commit_sha }}
+          RELEASE_BODY: ${{ needs.update-changelog.outputs.release_body }}
         run: |
           set -euo pipefail
 
-          if [[ -n "$TITLE" ]]; then
-            release_title="$TITLE $TAG"
+          # Prefer the changelog-sync commit when available so release and changelog align.
+          if [[ -n "$COMMIT_SHA" ]]; then
+            target_sha="$COMMIT_SHA"
           else
-            release_title="$TAG"
+            target_sha="$TARGET"
           fi
 
           release_args=(
             "$TAG"
-            --title "$release_title"
-            --target "$TARGET"
-            --generate-notes
+            --title "$RELEASE_TITLE"
+            --target "$target_sha"
           )
+
+          if [[ -n "$RELEASE_BODY" ]]; then
+            notes_file="$(mktemp)"
+            trap 'rm -f "$notes_file"' EXIT
+            printf '%s\n' "$RELEASE_BODY" > "$notes_file"
+            release_args+=(--notes-file "$notes_file")
+          else
+            release_args+=(--generate-notes)
+          fi
 
           if [[ "$PRERELEASE" == "true" ]]; then
             release_args+=(--prerelease)
@@ -119,78 +162,12 @@ jobs:
 
           gh release create "${release_args[@]}"
 
-      - name: Append full commit list to release notes
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.previous_release.outputs.resolved_tag }}
-          PREVIOUS_TAG: ${{ steps.previous_release.outputs.tag }}
-        run: |
-          set -euo pipefail
-
-          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
-
-          if [[ -n "$PREVIOUS_TAG" ]]; then
-            commit_range="$PREVIOUS_TAG..$TAG"
-            range_label="$PREVIOUS_TAG...$TAG"
-          else
-            commit_range="$TAG"
-            range_label="$TAG"
-          fi
-
-          notes_file="$(mktemp)"
-          trap 'rm -f "$notes_file"' EXIT
-
-          gh release view "$TAG" --json body --jq '.body' > "$notes_file"
-
-          {
-            echo
-            echo "## Full Commit List"
-            echo
-            echo "Range: $range_label"
-            echo
-          } >> "$notes_file"
-
-          commit_count=0
-          while IFS=$'\t' read -r commit_sha commit_subject; do
-            if [[ -z "$commit_sha" ]]; then
-              continue
-            fi
-
-            commit_count=$((commit_count + 1))
-            short_sha="$(git rev-parse --short "$commit_sha")"
-            printf -- '- %s ([`%s`](%s/%s/commit/%s))\n' \
-              "$commit_subject" \
-              "$short_sha" \
-              "$GITHUB_SERVER_URL" \
-              "$GITHUB_REPOSITORY" \
-              "$commit_sha" >> "$notes_file"
-          done < <(git log --reverse --format='%H%x09%s' "$commit_range")
-
-          if [[ "$commit_count" -eq 0 ]]; then
-            echo "- No commits found for this release range." >> "$notes_file"
-          fi
-
-          gh release edit "$TAG" --notes-file "$notes_file"
-
-      - name: Trigger changelog sync workflow
-        if: inputs.draft == false
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.previous_release.outputs.resolved_tag }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-
-          gh workflow run sync-changelog-from-release.yml \
-            --ref "$REF_NAME" \
-            -f tag="$TAG"
-
       - name: Summarize release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.previous_release.outputs.resolved_tag }}
+          TAG: ${{ needs.prepare.outputs.resolved_tag }}
           TARGET: ${{ inputs.target }}
-          PREVIOUS_TAG: ${{ steps.previous_release.outputs.tag }}
+          PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
         run: |
           set -euo pipefail
 
