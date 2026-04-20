@@ -136,7 +136,7 @@ jobs:
             :
           else
             # Path 2: attempt to fetch existing release by tag.
-            encoded_tag="$(jq -rn --arg tag "$TAG" '$tag|@uri')"
+            encoded_tag="$(jq -rn --arg tag "$TAG" "\$tag|@uri")"
             api_error_file="$(mktemp)"
             trap_files+=("$api_error_file")
 
@@ -154,7 +154,7 @@ jobs:
               fi
 
               # Path 3: release does not exist yet; generate notes from HEAD or tag.
-              previous_tag="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -s -r 'map(.[]) | map(select(.draft == false)) | .[0].tag_name // ""')"
+              previous_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -r 'map(select(.draft == false)) | .[0].tag_name // ""')"
 
               if [[ "${GENERATE_FROM_HEAD:-false}" == "true" ]]; then
                 commit_target="HEAD"
@@ -171,7 +171,7 @@ jobs:
                 --arg tag_name "$TAG" \
                 --arg target_commitish "$commit_target" \
                 --arg previous_tag "$previous_tag" \
-                'if $previous_tag != "" then {tag_name: $tag_name, target_commitish: $target_commitish, previous_tag_name: $previous_tag} else {tag_name: $tag_name, target_commitish: $target_commitish} end'
+                "if \$previous_tag != \"\" then {tag_name: \$tag_name, target_commitish: \$target_commitish, previous_tag_name: \$previous_tag} else {tag_name: \$tag_name, target_commitish: \$target_commitish} end"
               )"
 
               BODY="$(echo "$generate_args" | gh api --method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" --input - --jq '.body')"
@@ -208,8 +208,8 @@ jobs:
               commit_range="${previous_tag}..${commit_target}"
               range_label="${previous_tag}...${commit_target}"
             else
-              commit_range="${commit_target}"
-              range_label="${commit_target}"
+              commit_range=""
+              range_label="initial release"
             fi
 
             full_commit_section="$(mktemp)"
@@ -223,21 +223,25 @@ jobs:
             } > "$full_commit_section"
 
             commit_count=0
-            while IFS=$'\t' read -r commit_sha commit_subject; do
-              if [[ -z "$commit_sha" ]]; then
-                continue
-              fi
-              commit_count=$((commit_count + 1))
-              short_sha="$(git rev-parse --short "$commit_sha")"
-              printf -- '- %s ([`%s`](%s/%s/commit/%s))\n' \
-                "$commit_subject" \
-                "$short_sha" \
-                "$GITHUB_SERVER_URL" \
-                "$GITHUB_REPOSITORY" \
-                "$commit_sha" >> "$full_commit_section"
-            done < <(git log --reverse --format='%H%x09%s' "$commit_range")
+            if [[ -n "$commit_range" ]]; then
+              while IFS=$'\t' read -r commit_sha commit_subject; do
+                if [[ -z "$commit_sha" ]]; then
+                  continue
+                fi
+                commit_count=$((commit_count + 1))
+                short_sha="$(git rev-parse --short "$commit_sha")"
+                printf -- "- %s ([\`%s\`](%s/%s/commit/%s))\n" \
+                  "$commit_subject" \
+                  "$short_sha" \
+                  "$GITHUB_SERVER_URL" \
+                  "$GITHUB_REPOSITORY" \
+                  "$commit_sha" >> "$full_commit_section"
+              done < <(git log --reverse --format='%H%x09%s' "$commit_range")
+            else
+              echo "- Initial release; full commit history omitted." >> "$full_commit_section"
+            fi
 
-            if [[ "$commit_count" -eq 0 ]]; then
+            if [[ -n "$commit_range" && "$commit_count" -eq 0 ]]; then
               echo "- No commits found for this release range." >> "$full_commit_section"
             fi
 

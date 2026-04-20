@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          previous_tag="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -s -r 'map(.[]) | map(select(.draft == false)) | .[0].tag_name // ""')"
+          previous_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -r 'map(select(.draft == false)) | .[0].tag_name // ""')"
           echo "previous_tag=${previous_tag}" >> "$GITHUB_OUTPUT"
 
           if [[ -n "$INPUT_TAG" ]]; then
@@ -160,7 +160,11 @@ jobs:
             release_args+=(--draft)
           fi
 
-          gh release create "${release_args[@]}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; skipping creation."
+          else
+            gh release create "${release_args[@]}"
+          fi
 
       - name: Summarize release
         env:
