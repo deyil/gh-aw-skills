@@ -117,12 +117,14 @@ jobs:
           fi
 
       - name: Check out target history
+        if: inputs.draft == false
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ inputs.target }}
 
       - name: Assemble release notes
+        if: inputs.draft == false
         id: notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -172,8 +174,8 @@ jobs:
               [[ -z "$sha" ]] && continue
               commit_count=$((commit_count + 1))
               short="$(git rev-parse --short "$sha")"
-              printf -- "- %s ([\`%s\`](https://github.com/%s/commit/%s))\n" \
-                "$subject" "$short" "$GITHUB_REPOSITORY" "$sha" >> "$commit_section"
+              printf -- "- %s ([\`%s\`](%s/%s/commit/%s))\n" \
+                "$subject" "$short" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$sha" >> "$commit_section"
             done < <(git log --reverse --format='%H%x09%s' "$commit_range")
           else
             echo "- Initial release; full commit history omitted." >> "$commit_section"
@@ -187,10 +189,10 @@ jobs:
             echo
             echo "---"
             if [[ -n "$PREVIOUS_TAG" ]]; then
-              printf '[Compare changes](https://github.com/%s/compare/%s...%s) | ' \
-                "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$TAG"
+              printf '[Compare changes](%s/%s/compare/%s...%s) | ' \
+                "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$TAG"
             fi
-            printf '[Release page](https://github.com/%s/releases/tag/%s)\n' "$GITHUB_REPOSITORY" "$TAG"
+            printf '[Release page](%s/%s/releases/tag/%s)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG"
           } >> "$commit_section"
 
           release_body="${generated_body}"$'\n'"$(cat "$commit_section")"
@@ -219,13 +221,15 @@ jobs:
             --target "$TARGET"
           )
 
-          notes_file="$(mktemp)"
-          cleanup_notes_file() {
-            rm -f "$notes_file"
-          }
-          trap cleanup_notes_file EXIT
-          printf '%s\n' "$RELEASE_BODY" > "$notes_file"
-          release_args+=(--notes-file "$notes_file")
+          if [[ -n "$RELEASE_BODY" ]]; then
+            notes_file="$(mktemp)"
+            cleanup_notes_file() {
+              rm -f "$notes_file"
+            }
+            trap cleanup_notes_file EXIT
+            printf '%s\n' "$RELEASE_BODY" > "$notes_file"
+            release_args+=(--notes-file "$notes_file")
+          fi
 
           if [[ "$PRERELEASE" == "true" ]]; then
             release_args+=(--prerelease)
