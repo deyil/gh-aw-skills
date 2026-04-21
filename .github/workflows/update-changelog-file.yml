@@ -148,6 +148,13 @@ jobs:
             fi
           } > "$tmp_file"
 
+          if [[ -f CHANGELOG.md ]] && cmp -s "$tmp_file" CHANGELOG.md; then
+            rm -f "$tmp_file"
+            echo "Changelog already matches the generated release entry."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           mv "$tmp_file" CHANGELOG.md
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
