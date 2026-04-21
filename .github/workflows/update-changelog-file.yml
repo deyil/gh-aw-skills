@@ -94,16 +94,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Deduplicate: skip if entry for this release URL already exists.
-          if [[ -f CHANGELOG.md ]] && awk -v url="$URL" '
-            /^## \[/ && index($0, "](" url ")") { found=1; exit }
-            END { exit !found }
-          ' CHANGELOG.md; then
-            echo "Changelog already contains an entry for this release; skipping."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           # --- Heading ---
           release_title="$TAG"
           if [[ -n "$NAME" ]]; then
@@ -121,6 +111,26 @@ jobs:
             heading="## [$release_title]($URL) - $release_date"
           fi
 
+          existing_sections_file="$(mktemp)"
+          cleanup_existing_sections() {
+            rm -f "$existing_sections_file"
+          }
+          trap cleanup_existing_sections EXIT
+
+          if [[ -f CHANGELOG.md ]]; then
+            awk -v url="$URL" '
+              BEGIN {
+                skipping = 0
+              }
+              /^## \[/ {
+                skipping = index($0, "](" url ")") > 0
+              }
+              !skipping {
+                print
+              }
+            ' CHANGELOG.md | sed -n '/^## /,$p' > "$existing_sections_file"
+          fi
+
           tmp_file="$(mktemp)"
           {
             echo "# Changelog"
@@ -133,8 +143,8 @@ jobs:
             echo
             printf '%s\n' "$BODY"
             echo
-            if [[ -f CHANGELOG.md ]]; then
-              sed -n '/^## /,$p' CHANGELOG.md
+            if [[ -s "$existing_sections_file" ]]; then
+              cat "$existing_sections_file"
             fi
           } > "$tmp_file"
 
