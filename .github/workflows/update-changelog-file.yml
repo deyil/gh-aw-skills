@@ -63,12 +63,24 @@ jobs:
           body="$(echo "$latest" | jq -r '.body // ""')"
           prerelease="$(echo "$latest" | jq -r '.prerelease')"
 
+          if [[ -n "$EVENT_TAG" ]]; then
+            release_index="$(echo "$releases" | jq -r --arg t "$EVENT_TAG" 'to_entries | map(select(.value.tag_name == $t)) | .[0].key // ""')"
+          else
+            release_index="0"
+          fi
+
+          previous_tag=""
+          if [[ -n "$release_index" ]]; then
+            previous_tag="$(echo "$releases" | jq -r --argjson idx "$release_index" '.[($idx + 1)].tag_name // ""')"
+          fi
+
           {
             echo "tag=$tag"
             echo "name=$name"
             echo "url=$url"
             echo "published_at=$published_at"
             echo "prerelease=$prerelease"
+            echo "previous_tag=$previous_tag"
           } >> "$GITHUB_OUTPUT"
 
           body_delimiter="body-$(uuidgen)"
@@ -91,6 +103,7 @@ jobs:
           PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
           BODY: ${{ steps.release.outputs.body }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          PREVIOUS_TAG: ${{ steps.release.outputs.previous_tag }}
         run: |
           set -euo pipefail
 
@@ -110,6 +123,8 @@ jobs:
           else
             heading="## [$release_title]($URL) - $release_date"
           fi
+
+          normalized_body="$(printf '%s' "$BODY" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\) \| )?\[Release page\]\([^\n]+\)\n?\z//s')"
 
           existing_sections_file="$(mktemp)"
           cleanup_existing_sections() {
@@ -141,7 +156,14 @@ jobs:
             echo
             echo "$heading"
             echo
-            printf '%s\n' "$BODY"
+            printf '%s\n' "$normalized_body"
+            echo
+            echo "---"
+            if [[ -n "$PREVIOUS_TAG" ]]; then
+              printf '[Compare changes](%s/%s/compare/%s...%s) | ' \
+                "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$TAG"
+            fi
+            printf '[Release page](%s)\n' "$URL"
             echo
             if [[ -s "$existing_sections_file" ]]; then
               cat "$existing_sections_file"
