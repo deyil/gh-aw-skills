@@ -1,0 +1,159 @@
+name: Render changelog and release markdown
+description: Render shared markdown sections for changelog and GitHub release bodies.
+inputs:
+  tag:
+    description: Resolved release tag.
+    required: true
+  title:
+    description: Release title used for the changelog heading (falls back to tag when empty).
+    required: false
+    default: ""
+  release_url:
+    description: Release URL to include in heading and footer links.
+    required: true
+  published_at:
+    description: Release publish timestamp in ISO 8601 form.
+    required: false
+    default: ""
+  prerelease:
+    description: Whether this is a prerelease.
+    required: false
+    default: "false"
+  previous_tag:
+    description: Previous release tag for compare links.
+    required: false
+    default: ""
+  main_body_markdown:
+    description: Main release notes markdown.
+    required: true
+  appendix_markdown:
+    description: Optional appendix markdown appended after the main body.
+    required: false
+    default: ""
+outputs:
+  rendered_footer:
+    description: Rendered release footer markdown.
+    value: ${{ steps.render.outputs.rendered_footer }}
+  rendered_release_body:
+    description: Rendered full release body markdown.
+    value: ${{ steps.render.outputs.rendered_release_body }}
+  rendered_changelog_entry:
+    description: Rendered changelog entry markdown including heading.
+    value: ${{ steps.render.outputs.rendered_changelog_entry }}
+runs:
+  using: composite
+  steps:
+    - name: Render markdown from templates
+      id: render
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        TITLE: ${{ inputs.title }}
+        RELEASE_URL: ${{ inputs.release_url }}
+        PUBLISHED_AT: ${{ inputs.published_at }}
+        PRERELEASE: ${{ inputs.prerelease }}
+        PREVIOUS_TAG: ${{ inputs.previous_tag }}
+        MAIN_BODY_MARKDOWN: ${{ inputs.main_body_markdown }}
+        APPENDIX_MARKDOWN: ${{ inputs.appendix_markdown }}
+      run: |
+        set -euo pipefail
+
+        template_dir="${GITHUB_ACTION_PATH}/templates"
+        heading_template="${template_dir}/heading.md.tmpl"
+        footer_template="${template_dir}/footer.md.tmpl"
+        release_body_template="${template_dir}/release-body.md.tmpl"
+        changelog_entry_template="${template_dir}/changelog-entry.md.tmpl"
+
+        main_body="$(printf '%s' "$MAIN_BODY_MARKDOWN" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\) \| )?\[Release page\]\([^\n]+\)\n*\z//s; s/\n+\z//')"
+        if [[ -z "$main_body" ]]; then
+          main_body="- No release notes were provided for this release."
+        fi
+
+        appendix_body="$(printf '%s' "$APPENDIX_MARKDOWN" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\) \| )?\[Release page\]\([^\n]+\)\n*\z//s; s/\n+\z//')"
+
+        release_title="$TAG"
+        if [[ -n "$TITLE" ]]; then
+          release_title="$TITLE"
+        fi
+
+        release_date="${PUBLISHED_AT%%T*}"
+        if [[ -z "$release_date" ]]; then
+          release_date="$(date -u +%F)"
+        fi
+
+        prerelease_suffix=""
+        if [[ "$PRERELEASE" == "true" ]]; then
+          prerelease_suffix=" [prerelease]"
+        fi
+
+        compare_prefix=""
+        if [[ -n "$PREVIOUS_TAG" ]]; then
+          compare_prefix="[Compare changes](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${TAG}) | "
+        fi
+
+        appendix_block=""
+        if [[ -n "$appendix_body" ]]; then
+          appendix_block=$'\n\n'
+          appendix_block+="$appendix_body"
+        fi
+
+        render_template() {
+          local template_path="$1"
+          TPL_RELEASE_TITLE="$release_title" \
+          TPL_RELEASE_URL="$RELEASE_URL" \
+          TPL_RELEASE_DATE="$release_date" \
+          TPL_PRERELEASE_SUFFIX="$prerelease_suffix" \
+          TPL_MAIN_BODY="$main_body" \
+          TPL_APPENDIX_BLOCK="$appendix_block" \
+          TPL_COMPARE_PREFIX="$compare_prefix" \
+          perl -0pe '
+            my %replacements = (
+              RELEASE_TITLE => ($ENV{TPL_RELEASE_TITLE} // q{}),
+              RELEASE_URL => ($ENV{TPL_RELEASE_URL} // q{}),
+              RELEASE_DATE => ($ENV{TPL_RELEASE_DATE} // q{}),
+              PRERELEASE_SUFFIX => ($ENV{TPL_PRERELEASE_SUFFIX} // q{}),
+              MAIN_BODY => ($ENV{TPL_MAIN_BODY} // q{}),
+              APPENDIX_BLOCK => ($ENV{TPL_APPENDIX_BLOCK} // q{}),
+              COMPARE_PREFIX => ($ENV{TPL_COMPARE_PREFIX} // q{}),
+              HEADING => ($ENV{TPL_HEADING} // q{}),
+              FOOTER => ($ENV{TPL_FOOTER} // q{}),
+            );
+
+            s/__([A-Z_]+)__/exists $replacements{$1} ? $replacements{$1} : $&/ge;
+          ' "$template_path"
+        }
+
+        rendered_heading="$(render_template "$heading_template")"
+        rendered_footer="$(render_template "$footer_template")"
+
+        rendered_release_body="$(
+          TPL_FOOTER="$rendered_footer" \
+          render_template "$release_body_template"
+        )"
+
+        rendered_changelog_entry="$(
+          TPL_HEADING="$rendered_heading" \
+          TPL_FOOTER="$rendered_footer" \
+          render_template "$changelog_entry_template"
+        )"
+
+        footer_delimiter="footer-$(uuidgen)"
+        {
+          echo "rendered_footer<<$footer_delimiter"
+          printf '%s\n' "$rendered_footer"
+          echo "$footer_delimiter"
+        } >> "$GITHUB_OUTPUT"
+
+        release_body_delimiter="release-body-$(uuidgen)"
+        {
+          echo "rendered_release_body<<$release_body_delimiter"
+          printf '%s\n' "$rendered_release_body"
+          echo "$release_body_delimiter"
+        } >> "$GITHUB_OUTPUT"
+
+        changelog_delimiter="changelog-entry-$(uuidgen)"
+        {
+          echo "rendered_changelog_entry<<$changelog_delimiter"
+          printf '%s\n' "$rendered_changelog_entry"
+          echo "$changelog_delimiter"
+        } >> "$GITHUB_OUTPUT"

@@ -14,7 +14,7 @@ on:
         default: ""
         type: string
       target:
-        description: Branch to target for the release. Must be an existing branch for published releases so changelog sync can push back to it. Defaults to main.
+        description: Branch to target for the release. Must be an existing branch for published releases. Defaults to main.
         required: false
         default: main
         type: string
@@ -33,7 +33,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: publish-release
+  group: release-changelog-${{ inputs.target }}
   cancel-in-progress: false
 
 jobs:
@@ -57,24 +57,53 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           INPUT_TAG: ${{ inputs.tag }}
           TITLE: ${{ inputs.title }}
+          TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
 
-          previous_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -r 'map(select(.draft == false)) | .[0].tag_name // ""')"
+          encoded_target="$(jq -rn --arg target "$TARGET" "\$target|@uri")"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/branches/${encoded_target}" >/dev/null 2>&1; then
+            echo "Target must be an existing branch name for releases: $TARGET" >&2
+            exit 1
+          fi
+
+          git fetch --force --tags origin
+          git fetch --force origin "+refs/heads/*:refs/remotes/origin/*"
+
+          releases="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" | jq -s 'add | map(select(.draft == false))')"
+          branch_release_tags_file="$(mktemp)"
+          cleanup_branch_release_tags() {
+            rm -f "$branch_release_tags_file"
+          }
+          trap cleanup_branch_release_tags EXIT
+
+          while IFS= read -r release_tag; do
+            [[ -z "$release_tag" ]] && continue
+            if ! git rev-parse -q --verify "refs/tags/${release_tag}" >/dev/null 2>&1; then
+              continue
+            fi
+
+            tag_commit="$(git rev-list -n 1 "refs/tags/${release_tag}")"
+            if git merge-base --is-ancestor "$tag_commit" "refs/remotes/origin/${TARGET}"; then
+              printf '%s\n' "$release_tag" >> "$branch_release_tags_file"
+            fi
+          done < <(printf '%s' "$releases" | jq -r '.[].tag_name // ""')
+
+          previous_tag="$(head -n 1 "$branch_release_tags_file" || true)"
           echo "previous_tag=${previous_tag}" >> "$GITHUB_OUTPUT"
 
           if [[ -n "$INPUT_TAG" ]]; then
             resolved_tag="$INPUT_TAG"
           elif [[ -n "$previous_tag" ]]; then
-            # Bump the minor segment and reset patch for supported tags: v1.2.3 -> v1.3.0
-            if [[ "$previous_tag" =~ ^(v)?([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            # Bump the minor segment and reset patch for supported tags, including repo form v.1.2.3.
+            if [[ "$previous_tag" =~ ^(v\.?)?([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
               tag_prefix="${BASH_REMATCH[1]}"
               major="${BASH_REMATCH[2]}"
               minor="${BASH_REMATCH[3]}"
               resolved_tag="${tag_prefix}${major}.$((minor + 1)).0"
             else
               echo "Cannot auto-increment from previous release tag: $previous_tag" >&2
-              echo "Supported format is v<major>.<minor>.<patch> or <major>.<minor>.<patch>. Provide an explicit tag input." >&2
+              echo "Supported format is v<major>.<minor>.<patch>, v.<major>.<minor>.<patch>, or <major>.<minor>.<patch>. Provide an explicit tag input." >&2
               exit 1
             fi
           else
@@ -103,7 +132,6 @@ jobs:
 
     steps:
       - name: Validate target branch
-        if: inputs.draft == false
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET: ${{ inputs.target }}
@@ -117,14 +145,12 @@ jobs:
           fi
 
       - name: Check out target history
-        if: inputs.draft == false
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ inputs.target }}
 
-      - name: Assemble release notes
-        if: inputs.draft == false
+      - name: Assemble release notes and commit appendix
         id: notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -161,7 +187,6 @@ jobs:
           fi
 
           {
-            echo
             echo "## Full Commit List"
             echo
             echo "Range: $range_label"
@@ -185,64 +210,211 @@ jobs:
             echo "- No commits found for this release range." >> "$commit_section"
           fi
 
+          appendix_delimiter="appendix-$(uuidgen)"
           {
-            echo
-            echo "---"
-            if [[ -n "$PREVIOUS_TAG" ]]; then
-              printf '[Compare changes](%s/%s/compare/%s...%s) | ' \
-                "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$TAG"
-            fi
-            printf '[Release page](%s/%s/releases/tag/%s)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG"
-          } >> "$commit_section"
+            echo "appendix_markdown<<$appendix_delimiter"
+            cat "$commit_section"
+            echo "$appendix_delimiter"
+          } >> "$GITHUB_OUTPUT"
 
-          release_body="${generated_body}"$'\n'"$(cat "$commit_section")"
           body_delimiter="body-$(uuidgen)"
           {
-            echo "release_body<<$body_delimiter"
-            printf '%s\n' "$release_body"
+            echo "main_body_markdown<<$body_delimiter"
+            printf '%s\n' "$generated_body"
             echo "$body_delimiter"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Render release and changelog markdown
+        id: render
+        uses: ./.github/actions/changelog-render
+        with:
+          tag: ${{ needs.prepare.outputs.resolved_tag }}
+          title: ${{ needs.prepare.outputs.release_title }}
+          release_url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.resolved_tag }}
+          prerelease: ${{ inputs.prerelease }}
+          previous_tag: ${{ needs.prepare.outputs.previous_tag }}
+          main_body_markdown: ${{ steps.notes.outputs.main_body_markdown }}
+          appendix_markdown: ${{ steps.notes.outputs.appendix_markdown }}
+
+      - name: Merge changelog entry
+        if: inputs.draft == false
+        id: changelog
+        env:
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.resolved_tag }}
+          CHANGELOG_ENTRY: ${{ steps.render.outputs.rendered_changelog_entry }}
+        run: |
+          set -euo pipefail
+
+          existing_sections_file="$(mktemp)"
+          tmp_file="$(mktemp)"
+          cleanup_files() {
+            rm -f "$existing_sections_file" "$tmp_file"
+          }
+          trap cleanup_files EXIT
+
+          if [[ -f CHANGELOG.md ]]; then
+            awk -v url="$RELEASE_URL" '
+              BEGIN {
+                skipping = 0
+              }
+              /^## \[/ {
+                skipping = index($0, "](" url ")") > 0
+              }
+              !skipping {
+                print
+              }
+            ' CHANGELOG.md | sed -n '/^## /,$p' > "$existing_sections_file"
+          fi
+
+          {
+            echo "# Changelog"
+            echo
+            echo "All notable changes to this project will be documented in this file."
+            echo
+            echo "Release entries are added by publish-release runs and can be repaired manually."
+            echo
+            printf '%s\n' "$CHANGELOG_ENTRY"
+            echo
+            if [[ -s "$existing_sections_file" ]]; then
+              cat "$existing_sections_file"
+            fi
+          } > "$tmp_file"
+
+          if [[ -f CHANGELOG.md ]] && cmp -s "$tmp_file" CHANGELOG.md; then
+            echo "Changelog already matches the rendered release entry."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mv "$tmp_file" CHANGELOG.md
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push changelog
+        if: inputs.draft == false && steps.changelog.outputs.changed == 'true'
+        id: writeback
+        uses: ./.github/actions/git-writeback
+        with:
+          branch: ${{ inputs.target }}
+          commit_message: "docs: update changelog for ${{ needs.prepare.outputs.resolved_tag }}"
+          file_paths: |
+            CHANGELOG.md
+
+      - name: Resolve release target commit
+        id: release_target
+        run: |
+          set -euo pipefail
+
+          release_target_sha="$(git rev-parse HEAD)"
+          echo "sha=${release_target_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.resolved_tag }}
           RELEASE_TITLE: ${{ needs.prepare.outputs.release_title }}
-          TARGET: ${{ inputs.target }}
+          RELEASE_TARGET_SHA: ${{ steps.release_target.outputs.sha }}
           PRERELEASE: ${{ inputs.prerelease }}
           DRAFT: ${{ inputs.draft }}
-          RELEASE_BODY: ${{ steps.notes.outputs.release_body }}
+          RELEASE_BODY: ${{ steps.render.outputs.rendered_release_body }}
         run: |
           set -euo pipefail
 
-          release_args=(
-            "$TAG"
-            --title "$RELEASE_TITLE"
-            --target "$TARGET"
-          )
-
-          if [[ -n "$RELEASE_BODY" ]]; then
-            notes_file="$(mktemp)"
-            cleanup_notes_file() {
-              rm -f "$notes_file"
-            }
-            trap cleanup_notes_file EXIT
-            printf '%s\n' "$RELEASE_BODY" > "$notes_file"
-            release_args+=(--notes-file "$notes_file")
+          if [[ "$PRERELEASE" != "true" && "$PRERELEASE" != "false" ]]; then
+            echo "Unexpected prerelease input value: $PRERELEASE" >&2
+            exit 1
+          fi
+          if [[ "$DRAFT" != "true" && "$DRAFT" != "false" ]]; then
+            echo "Unexpected draft input value: $DRAFT" >&2
+            exit 1
           fi
 
-          if [[ "$PRERELEASE" == "true" ]]; then
-            release_args+=(--prerelease)
-          fi
+          encoded_tag="$(jq -rn --arg tag "$TAG" "\$tag|@uri")"
+          release_lookup="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${encoded_tag}" 2>/dev/null || true)"
+          existing_release_id="$(printf '%s' "$release_lookup" | jq -r '.id // ""')"
+          existing_release_draft="$(printf '%s' "$release_lookup" | jq -r '.draft // false')"
 
-          if [[ "$DRAFT" == "true" ]]; then
-            release_args+=(--draft)
-          fi
+          release_payload="$(jq -n \
+            --arg tag_name "$TAG" \
+            --arg name "$RELEASE_TITLE" \
+            --arg body "$RELEASE_BODY" \
+            --arg target_commitish "$RELEASE_TARGET_SHA" \
+            --argjson prerelease "$PRERELEASE" \
+            --argjson draft "$DRAFT" \
+            '{tag_name: $tag_name, target_commitish: $target_commitish, name: $name, body: $body, prerelease: $prerelease, draft: $draft}'
+          )"
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; skipping creation."
+          if [[ -n "$existing_release_id" ]]; then
+            replace_existing_release="false"
+
+            if [[ "$existing_release_draft" == "true" && "$DRAFT" == "false" ]]; then
+              replace_existing_release="true"
+            else
+              tag_ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${encoded_tag}")"
+              tag_object_type="$(printf '%s' "$tag_ref" | jq -r '.object.type // ""')"
+              tag_object_sha="$(printf '%s' "$tag_ref" | jq -r '.object.sha // ""')"
+
+              if [[ -z "$tag_object_sha" ]]; then
+                echo "Unable to resolve existing tag object for $TAG." >&2
+                exit 1
+              fi
+
+              if [[ "$tag_object_type" == "tag" ]]; then
+                tag_commit_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}" --jq '.object.sha // ""')"
+              else
+                tag_commit_sha="$tag_object_sha"
+              fi
+
+              if [[ "$tag_commit_sha" != "$RELEASE_TARGET_SHA" ]]; then
+                if [[ "$existing_release_draft" == "true" && "$DRAFT" == "true" ]]; then
+                  replace_existing_release="true"
+                else
+                  echo "Release $TAG already exists, but tag points to $tag_commit_sha instead of expected $RELEASE_TARGET_SHA. Refusing to patch release metadata on mismatched commit." >&2
+                  exit 1
+                fi
+              fi
+
+              if [[ "$replace_existing_release" != "true" ]]; then
+                printf '%s' "$release_payload" | gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${existing_release_id}" --input - >/dev/null
+                echo "Updated existing release $TAG (id: $existing_release_id)."
+              fi
+            fi
+
+            if [[ "$replace_existing_release" == "true" ]]; then
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${existing_release_id}" >/dev/null
+
+              delete_tag_error=""
+              if delete_tag_error="$({ gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${encoded_tag}" >/dev/null; } 2>&1)"; then
+                :
+              else
+                if printf '%s' "$delete_tag_error" | grep -Eqi '404|Not Found'; then
+                  echo "Tag ref for $TAG was already absent before recreation."
+                else
+                  printf '%s\n' "$delete_tag_error" >&2
+                  echo "Failed to delete existing tag ref for $TAG." >&2
+                  exit 1
+                fi
+              fi
+
+              verify_tag_error=""
+              if verify_tag_error="$({ gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${encoded_tag}" >/dev/null; } 2>&1)"; then
+                echo "Tag ref for $TAG still exists after deletion attempt; refusing to recreate release." >&2
+                exit 1
+              else
+                if printf '%s' "$verify_tag_error" | grep -Eqi '404|Not Found'; then
+                  :
+                else
+                  printf '%s\n' "$verify_tag_error" >&2
+                  echo "Failed to verify tag deletion for $TAG before release recreation." >&2
+                  exit 1
+                fi
+              fi
+
+              printf '%s' "$release_payload" | gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input - >/dev/null
+              echo "Replaced existing draft release $TAG (id: $existing_release_id) to retarget tag at ${RELEASE_TARGET_SHA}."
+            fi
           else
-            gh release create "${release_args[@]}"
+            printf '%s' "$release_payload" | gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input - >/dev/null
+            echo "Created release $TAG."
           fi
 
       - name: Summarize release
@@ -251,6 +423,9 @@ jobs:
           TAG: ${{ needs.prepare.outputs.resolved_tag }}
           TARGET: ${{ inputs.target }}
           PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+          DRAFT: ${{ inputs.draft }}
+          CHANGELOG_CHANGED: ${{ steps.changelog.outputs.changed }}
+          WRITEBACK_CHANGED: ${{ steps.writeback.outputs.changed }}
         run: |
           set -euo pipefail
 
@@ -265,6 +440,16 @@ jobs:
               echo "- Previous release: $PREVIOUS_TAG"
             else
               echo "- Previous release: none"
+            fi
+            echo "- Draft: $DRAFT"
+            if [[ "$DRAFT" == "true" ]]; then
+              echo "- Changelog writeback: skipped (draft release)"
+            elif [[ "${CHANGELOG_CHANGED:-false}" != "true" ]]; then
+              echo "- Changelog writeback: skipped (no changelog diff)"
+            elif [[ "${WRITEBACK_CHANGED:-false}" == "true" ]]; then
+              echo "- Changelog writeback: pushed"
+            else
+              echo "- Changelog writeback: no commit pushed"
             fi
             echo "- URL: $release_url"
           } >> "$GITHUB_STEP_SUMMARY"

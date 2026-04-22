@@ -1,0 +1,68 @@
+name: Git writeback
+description: Verify branch state, then commit and push staged files only when changed.
+inputs:
+  branch:
+    description: Expected branch name checked out in the workflow.
+    required: true
+  commit_message:
+    description: Commit message used for writeback.
+    required: true
+  file_paths:
+    description: Newline-delimited list of file paths to stage.
+    required: true
+outputs:
+  changed:
+    description: Whether a commit was created and pushed.
+    value: ${{ steps.writeback.outputs.changed }}
+runs:
+  using: composite
+  steps:
+    - name: Verify branch checkout
+      shell: bash
+      env:
+        EXPECTED_BRANCH: ${{ inputs.branch }}
+      run: |
+        set -euo pipefail
+
+        if ! git symbolic-ref -q HEAD >/dev/null; then
+          echo "::error::Checkout is in detached HEAD state. Cannot push changelog commit." >&2
+          exit 1
+        fi
+
+        current_branch="$(git symbolic-ref --short HEAD)"
+        if [[ "$current_branch" != "$EXPECTED_BRANCH" ]]; then
+          echo "::error::Checked out branch '$current_branch' does not match expected '$EXPECTED_BRANCH'." >&2
+          exit 1
+        fi
+
+    - name: Configure git bot identity
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+    - name: Stage, commit, and push when changed
+      id: writeback
+      shell: bash
+      env:
+        COMMIT_MESSAGE: ${{ inputs.commit_message }}
+        FILE_PATHS: ${{ inputs.file_paths }}
+      run: |
+        set -euo pipefail
+
+        while IFS= read -r path; do
+          [[ -z "$path" ]] && continue
+          git add "$path"
+        done <<< "$FILE_PATHS"
+
+        if git diff --cached --quiet; then
+          echo "No staged changes detected."
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        git commit -m "$COMMIT_MESSAGE"
+        git push origin HEAD
+        echo "changed=true" >> "$GITHUB_OUTPUT"

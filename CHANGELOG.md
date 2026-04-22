@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-Release entries are synchronized from published GitHub releases.
+Release entries are added by publish-release runs and can be repaired manually.
 
 ## [v.0.2.1](https://github.com/deyil/gh-aw-skills/releases/tag/v.0.2.1) - 2026-04-17
 
