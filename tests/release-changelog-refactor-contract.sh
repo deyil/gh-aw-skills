@@ -148,6 +148,7 @@ require_fixed "$publish_workflow" 'releases/generate-notes' 'publish-release sti
 require_fixed "$publish_workflow" 'if: inputs.draft == false' 'publish-release still gates published-only steps behind draft=false'
 require_local_action_refs "$publish_workflow" 2 'publish-release uses local composite actions for rendering and writeback'
 require_fixed "$publish_workflow" 'uses: ./.github/actions/git-writeback' 'publish-release references the shared git-writeback action'
+require_fixed "$publish_workflow" 'Unable to resolve commit SHA for annotated tag $TAG.' 'publish-release fails clearly when annotated tag commit resolution is empty'
 
 require_regex "$update_workflow" '^  workflow_dispatch:' 'update-changelog remains manually invokable'
 require_no_regex "$update_workflow" '^  release:' 'update-changelog no longer listens to release.published'

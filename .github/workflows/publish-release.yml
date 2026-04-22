@@ -360,6 +360,10 @@ jobs:
 
               if [[ "$tag_object_type" == "tag" ]]; then
                 tag_commit_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}" --jq '.object.sha // ""')"
+                if [[ -z "$tag_commit_sha" ]]; then
+                  echo "Unable to resolve commit SHA for annotated tag $TAG." >&2
+                  exit 1
+                fi
               else
                 tag_commit_sha="$tag_object_sha"
               fi
