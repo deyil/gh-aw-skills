@@ -1,0 +1,135 @@
+name: Build changelog entry
+description: Fetch the target release metadata and render the full changelog content.
+
+inputs:
+  event-tag:
+    description: Release tag from the triggering release event. Leave blank to use the latest published release.
+    required: false
+    default: ""
+  changelog-path:
+    description: Path to the changelog file to read and replace matching release sections from.
+    required: false
+    default: CHANGELOG.md
+
+outputs:
+  tag:
+    description: Tag of the release used to build the changelog content.
+    value: ${{ steps.build.outputs.tag }}
+  generated-changelog:
+    description: Fully rendered changelog content.
+    value: ${{ steps.build.outputs.generated-changelog }}
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch release metadata and render changelog
+      id: build
+      shell: bash
+      env:
+        EVENT_TAG: ${{ inputs.event-tag }}
+        CHANGELOG_PATH: ${{ inputs.changelog-path }}
+      run: |
+        set -euo pipefail
+
+        releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+          | jq 'map(select(.draft == false))')"
+
+        if [[ -n "$EVENT_TAG" ]]; then
+          latest="$(echo "$releases" | jq --arg t "$EVENT_TAG" \
+            'map(select(.tag_name == $t)) | .[0]')"
+        else
+          latest="$(echo "$releases" | jq '.[0]')"
+        fi
+
+        if [[ -z "$latest" || "$latest" == "null" ]]; then
+          echo "No matching published release found." >&2
+          exit 1
+        fi
+
+        tag="$(echo "$latest" | jq -r '.tag_name')"
+        name="$(echo "$latest" | jq -r '.name // ""')"
+        url="$(echo "$latest" | jq -r '.html_url')"
+        published_at="$(echo "$latest" | jq -r '.published_at // ""')"
+        body="$(echo "$latest" | jq -r '.body // ""')"
+        prerelease="$(echo "$latest" | jq -r '.prerelease')"
+
+        if [[ -n "$EVENT_TAG" ]]; then
+          release_index="$(echo "$releases" | jq -r --arg t "$EVENT_TAG" 'to_entries | map(select(.value.tag_name == $t)) | .[0].key // ""')"
+        else
+          release_index="0"
+        fi
+
+        previous_tag=""
+        if [[ -n "$release_index" ]]; then
+          previous_tag="$(echo "$releases" | jq -r --argjson idx "$release_index" '.[($idx + 1)].tag_name // ""')"
+        fi
+
+        release_title="$tag"
+        if [[ -n "$name" ]]; then
+          release_title="$name"
+        fi
+
+        release_date="${published_at%%T*}"
+        if [[ -z "$release_date" ]]; then
+          release_date="$(date -u +%F)"
+        fi
+
+        if [[ "$prerelease" == "true" ]]; then
+          heading="## [$release_title]($url) - $release_date [prerelease]"
+        else
+          heading="## [$release_title]($url) - $release_date"
+        fi
+
+        normalized_body="$(printf '%s' "$body" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\) \| )?\[Release page\]\([^\n]+\)\n?\z//s')"
+
+        existing_sections_file="$(mktemp)"
+        generated_file="$(mktemp)"
+        cleanup_files() {
+          rm -f "$existing_sections_file" "$generated_file"
+        }
+        trap cleanup_files EXIT
+
+        if [[ -f "$CHANGELOG_PATH" ]]; then
+          awk -v url="$url" '
+            BEGIN {
+              skipping = 0
+            }
+            /^## \[/ {
+              skipping = index($0, "](" url ")") > 0
+            }
+            !skipping {
+              print
+            }
+          ' "$CHANGELOG_PATH" | sed -n '/^## /,$p' > "$existing_sections_file"
+        fi
+
+        {
+          echo "# Changelog"
+          echo
+          echo "All notable changes to this project will be documented in this file."
+          echo
+          echo "Release entries are synchronized from published GitHub releases."
+          echo
+          echo "$heading"
+          echo
+          printf '%s\n' "$normalized_body"
+          echo
+          echo "---"
+          if [[ -n "$previous_tag" ]]; then
+            printf '[Compare changes](%s/%s/compare/%s...%s) | ' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$previous_tag" "$tag"
+          fi
+          printf '[Release page](%s)\n' "$url"
+          echo
+          if [[ -s "$existing_sections_file" ]]; then
+            cat "$existing_sections_file"
+          fi
+        } > "$generated_file"
+
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        generated_delimiter="generated-changelog-$(uuidgen)"
+        {
+          echo "generated-changelog<<$generated_delimiter"
+          cat "$generated_file"
+          echo "$generated_delimiter"
+        } >> "$GITHUB_OUTPUT"

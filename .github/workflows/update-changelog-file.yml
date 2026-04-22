@@ -33,142 +33,24 @@ jobs:
             exit 1
           fi
 
-      - name: Fetch release metadata
-        id: release
+      - name: Build changelog content
+        id: changelog_data
+        uses: ./.github/actions/build-changelog-entry
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          set -euo pipefail
-
-          releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
-            | jq 'map(select(.draft == false))')"
-
-          if [[ -n "$EVENT_TAG" ]]; then
-            latest="$(echo "$releases" | jq --arg t "$EVENT_TAG" \
-              'map(select(.tag_name == $t)) | .[0]')"
-          else
-            latest="$(echo "$releases" | jq '.[0]')"
-          fi
-
-          if [[ -z "$latest" || "$latest" == "null" ]]; then
-            echo "No matching published release found." >&2
-            exit 1
-          fi
-
-          tag="$(echo "$latest" | jq -r '.tag_name')"
-          name="$(echo "$latest" | jq -r '.name // ""')"
-          url="$(echo "$latest" | jq -r '.html_url')"
-          published_at="$(echo "$latest" | jq -r '.published_at // ""')"
-          body="$(echo "$latest" | jq -r '.body // ""')"
-          prerelease="$(echo "$latest" | jq -r '.prerelease')"
-
-          if [[ -n "$EVENT_TAG" ]]; then
-            release_index="$(echo "$releases" | jq -r --arg t "$EVENT_TAG" 'to_entries | map(select(.value.tag_name == $t)) | .[0].key // ""')"
-          else
-            release_index="0"
-          fi
-
-          previous_tag=""
-          if [[ -n "$release_index" ]]; then
-            previous_tag="$(echo "$releases" | jq -r --argjson idx "$release_index" '.[($idx + 1)].tag_name // ""')"
-          fi
-
-          {
-            echo "tag=$tag"
-            echo "name=$name"
-            echo "url=$url"
-            echo "published_at=$published_at"
-            echo "prerelease=$prerelease"
-            echo "previous_tag=$previous_tag"
-          } >> "$GITHUB_OUTPUT"
-
-          body_delimiter="body-$(uuidgen)"
-          {
-            echo "body<<$body_delimiter"
-            if [[ -n "$body" ]]; then
-              printf '%s\n' "$body"
-            else
-              echo "- No release notes were provided for this release."
-            fi
-            echo "$body_delimiter"
-          } >> "$GITHUB_OUTPUT"
+        with:
+          event-tag: ${{ github.event.release.tag_name }}
+          changelog-path: CHANGELOG.md
 
       - name: Build and write changelog entry
         id: changelog
         env:
-          TAG: ${{ steps.release.outputs.tag }}
-          NAME: ${{ steps.release.outputs.name }}
-          URL: ${{ steps.release.outputs.url }}
-          PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
-          BODY: ${{ steps.release.outputs.body }}
-          PRERELEASE: ${{ steps.release.outputs.prerelease }}
-          PREVIOUS_TAG: ${{ steps.release.outputs.previous_tag }}
+          GENERATED_CHANGELOG: ${{ steps.changelog_data.outputs.generated-changelog }}
         run: |
           set -euo pipefail
 
-          # --- Heading ---
-          release_title="$TAG"
-          if [[ -n "$NAME" ]]; then
-            release_title="$NAME"
-          fi
-
-          release_date="${PUBLISHED_AT%%T*}"
-          if [[ -z "$release_date" ]]; then
-            release_date="$(date -u +%F)"
-          fi
-
-          if [[ "$PRERELEASE" == "true" ]]; then
-            heading="## [$release_title]($URL) - $release_date [prerelease]"
-          else
-            heading="## [$release_title]($URL) - $release_date"
-          fi
-
-          normalized_body="$(printf '%s' "$BODY" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\) \| )?\[Release page\]\([^\n]+\)\n?\z//s')"
-
-          existing_sections_file="$(mktemp)"
-          cleanup_existing_sections() {
-            rm -f "$existing_sections_file"
-          }
-          trap cleanup_existing_sections EXIT
-
-          if [[ -f CHANGELOG.md ]]; then
-            awk -v url="$URL" '
-              BEGIN {
-                skipping = 0
-              }
-              /^## \[/ {
-                skipping = index($0, "](" url ")") > 0
-              }
-              !skipping {
-                print
-              }
-            ' CHANGELOG.md | sed -n '/^## /,$p' > "$existing_sections_file"
-          fi
-
           tmp_file="$(mktemp)"
-          {
-            echo "# Changelog"
-            echo
-            echo "All notable changes to this project will be documented in this file."
-            echo
-            echo "Release entries are synchronized from published GitHub releases."
-            echo
-            echo "$heading"
-            echo
-            printf '%s\n' "$normalized_body"
-            echo
-            echo "---"
-            if [[ -n "$PREVIOUS_TAG" ]]; then
-              printf '[Compare changes](%s/%s/compare/%s...%s) | ' \
-                "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$PREVIOUS_TAG" "$TAG"
-            fi
-            printf '[Release page](%s)\n' "$URL"
-            echo
-            if [[ -s "$existing_sections_file" ]]; then
-              cat "$existing_sections_file"
-            fi
-          } > "$tmp_file"
+          printf '%s\n' "$GENERATED_CHANGELOG" > "$tmp_file"
 
           if [[ -f CHANGELOG.md ]] && cmp -s "$tmp_file" CHANGELOG.md; then
             rm -f "$tmp_file"
@@ -182,7 +64,7 @@ jobs:
 
       - name: Commit and push
         env:
-          TAG: ${{ steps.release.outputs.tag }}
+          TAG: ${{ steps.changelog_data.outputs.tag }}
           CHANGED: ${{ steps.changelog.outputs.changed }}
         run: |
           set -euo pipefail
@@ -201,7 +83,7 @@ jobs:
 
       - name: Summarize
         env:
-          TAG: ${{ steps.release.outputs.tag }}
+          TAG: ${{ steps.changelog_data.outputs.tag }}
           CHANGED: ${{ steps.changelog.outputs.changed }}
         run: |
           set -euo pipefail
