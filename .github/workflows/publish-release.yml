@@ -332,6 +332,20 @@ jobs:
           release_lookup="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${encoded_tag}" 2>/dev/null || true)"
           existing_release_id="$(printf '%s' "$release_lookup" | jq -r '.id // ""')"
           existing_release_draft="$(printf '%s' "$release_lookup" | jq -r '.draft // false')"
+          existing_release_target_commitish="$(printf '%s' "$release_lookup" | jq -r '.target_commitish // ""')"
+
+          matching_draft_releases="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            | jq -cs --arg tag "$TAG" 'add | map(select(.tag_name == $tag and .draft == true))')"
+          matching_draft_count="$(printf '%s' "$matching_draft_releases" | jq 'length')"
+          matching_draft_ids="$(printf '%s' "$matching_draft_releases" | jq -r '.[].id')"
+
+          if (( matching_draft_count > 0 )); then
+            if [[ -z "$existing_release_id" || "$existing_release_draft" != "true" ]]; then
+              existing_release_id="$(printf '%s' "$matching_draft_releases" | jq -r '.[0].id // ""')"
+              existing_release_draft="true"
+              existing_release_target_commitish="$(printf '%s' "$matching_draft_releases" | jq -r '.[0].target_commitish // ""')"
+            fi
+          fi
 
           release_payload="$(jq -n \
             --arg tag_name "$TAG" \
@@ -346,8 +360,19 @@ jobs:
           if [[ -n "$existing_release_id" ]]; then
             replace_existing_release="false"
 
-            if [[ "$existing_release_draft" == "true" && "$DRAFT" == "false" ]]; then
-              replace_existing_release="true"
+            if [[ "$existing_release_draft" == "true" ]]; then
+              if (( matching_draft_count > 1 )); then
+                replace_existing_release="true"
+              elif [[ "$DRAFT" == "false" ]]; then
+                replace_existing_release="true"
+              elif [[ "$existing_release_target_commitish" != "$RELEASE_TARGET_SHA" ]]; then
+                replace_existing_release="true"
+              fi
+
+              if [[ "$replace_existing_release" != "true" ]]; then
+                printf '%s' "$release_payload" | gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${existing_release_id}" --input - >/dev/null
+                echo "Updated existing draft release $TAG (id: $existing_release_id)."
+              fi
             else
               tag_ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${encoded_tag}")"
               tag_object_type="$(printf '%s' "$tag_ref" | jq -r '.object.type // ""')"
@@ -369,12 +394,8 @@ jobs:
               fi
 
               if [[ "$tag_commit_sha" != "$RELEASE_TARGET_SHA" ]]; then
-                if [[ "$existing_release_draft" == "true" && "$DRAFT" == "true" ]]; then
-                  replace_existing_release="true"
-                else
-                  echo "Release $TAG already exists, but tag points to $tag_commit_sha instead of expected $RELEASE_TARGET_SHA. Refusing to patch release metadata on mismatched commit." >&2
-                  exit 1
-                fi
+                echo "Release $TAG already exists, but tag points to $tag_commit_sha instead of expected $RELEASE_TARGET_SHA. Refusing to patch release metadata on mismatched commit." >&2
+                exit 1
               fi
 
               if [[ "$replace_existing_release" != "true" ]]; then
@@ -384,7 +405,14 @@ jobs:
             fi
 
             if [[ "$replace_existing_release" == "true" ]]; then
-              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${existing_release_id}" >/dev/null
+              if [[ -n "$matching_draft_ids" ]]; then
+                while IFS= read -r draft_release_id; do
+                  [[ -z "$draft_release_id" ]] && continue
+                  gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${draft_release_id}" >/dev/null
+                done <<< "$matching_draft_ids"
+              else
+                gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${existing_release_id}" >/dev/null
+              fi
 
               delete_tag_error=""
               if delete_tag_error="$({ gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${encoded_tag}" >/dev/null; } 2>&1)"; then
@@ -414,7 +442,7 @@ jobs:
               fi
 
               printf '%s' "$release_payload" | gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input - >/dev/null
-              echo "Replaced existing draft release $TAG (id: $existing_release_id) to retarget tag at ${RELEASE_TARGET_SHA}."
+              echo "Replaced existing draft release(s) for $TAG to target ${RELEASE_TARGET_SHA}."
             fi
           else
             printf '%s' "$release_payload" | gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input - >/dev/null
