@@ -2,7 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-Release entries are synchronized from published GitHub releases.
+Release entries are added by publish-release runs and can be repaired manually.
+
+## [CLI E2E e2e-20260423-fix-134710](https://github.com/deyil/gh-aw-skills/releases/tag/e2e-20260423-fix-134710) - 2026-04-23 [prerelease]
+
+**Full Changelog**: https://github.com/deyil/gh-aw-skills/compare/e2e-20260423-132626...e2e-20260423-fix-134710
+
+## Full Commit List
+
+Range: e2e-20260423-132626...e2e-20260423-fix-134710
+
+- test: add validation for adjacent placeholder rendering in changelog renderer ([`d6b8817`](https://github.com/deyil/gh-aw-skills/commit/d6b8817329707d6cbfc0d3288b528dbfdb8d6fc7))
+
+---
+[Compare changes](https://github.com/deyil/gh-aw-skills/compare/e2e-20260423-132626...e2e-20260423-fix-134710) | [Release page](https://github.com/deyil/gh-aw-skills/releases/tag/e2e-20260423-fix-134710)
+
+## [CLI E2E e2e-20260423-132626](https://github.com/deyil/gh-aw-skills/releases/tag/e2e-20260423-132626) - __RELEASE_DATE____PRERELEASE_SUFFIX__
+
+__MAIN_BODY____APPENDIX_BLOCK__
+
+---
+[Compare changes](https://github.com/deyil/gh-aw-skills/compare/v.0.2.1...e2e-20260423-132626) | [Release page](https://github.com/deyil/gh-aw-skills/releases/tag/e2e-20260423-132626)
 
 ## [v.0.2.1](https://github.com/deyil/gh-aw-skills/releases/tag/v.0.2.1) - 2026-04-17
 
