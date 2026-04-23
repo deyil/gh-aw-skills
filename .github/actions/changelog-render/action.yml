@@ -119,7 +119,7 @@ runs:
               FOOTER => ($ENV{TPL_FOOTER} // q{}),
             );
 
-            s/__([A-Z_]+)__/exists $replacements{$1} ? $replacements{$1} : $&/ge;
+            s/__([A-Z]+(?:_[A-Z]+)*)__/exists $replacements{$1} ? $replacements{$1} : $&/ge;
           ' "$template_path"
         }
 

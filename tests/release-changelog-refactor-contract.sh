@@ -100,6 +100,37 @@ require_composite_actions() {
   pass "$message"
 }
 
+require_adjacent_placeholder_render() {
+  local message="$1"
+  local rendered
+
+  rendered="$(
+    TPL_RELEASE_DATE='2026-04-23' \
+    TPL_PRERELEASE_SUFFIX=' [prerelease]' \
+    TPL_MAIN_BODY='Body line' \
+    TPL_APPENDIX_BLOCK=$'\n\nAppendix line' \
+    perl -0pe '
+      my %replacements = (
+        RELEASE_DATE => ($ENV{TPL_RELEASE_DATE} // q{}),
+        PRERELEASE_SUFFIX => ($ENV{TPL_PRERELEASE_SUFFIX} // q{}),
+        MAIN_BODY => ($ENV{TPL_MAIN_BODY} // q{}),
+        APPENDIX_BLOCK => ($ENV{TPL_APPENDIX_BLOCK} // q{}),
+      );
+
+      s/__([A-Z]+(?:_[A-Z]+)*)__/exists $replacements{$1} ? $replacements{$1} : $&/ge;
+    ' <<'EOF'
+__RELEASE_DATE____PRERELEASE_SUFFIX__
+__MAIN_BODY____APPENDIX_BLOCK__
+EOF
+  )"
+
+  if [[ "$rendered" == $'2026-04-23 [prerelease]\nBody line\n\nAppendix line' ]]; then
+    pass "$message"
+  else
+    fail "$message (rendered output was unexpected: $rendered)"
+  fi
+}
+
 run_actionlint() {
   local message="$1"
   local workflow_publish=.github/workflows/publish-release.yml
@@ -162,6 +193,7 @@ require_fixed "$publish_workflow" 'cancel-in-progress: false' 'publish-release k
 require_fixed "$update_workflow" 'cancel-in-progress: false' 'update-changelog keeps non-cancelling concurrency'
 
 require_composite_actions 'shared composite actions exist for the refactor'
+require_adjacent_placeholder_render 'changelog renderer replaces adjacent placeholders correctly'
 
 if (( failures > 0 )); then
   printf '\nContract check failed with %d issue(s).\n' "$failures" >&2
