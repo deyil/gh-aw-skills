@@ -88,7 +88,8 @@ runs:
 
         compare_prefix=""
         if [[ -n "$PREVIOUS_TAG" ]]; then
-          compare_prefix="[Compare changes](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${TAG}) | "
+          compare_prefix="[Compare changes](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${TAG})"
+          compare_prefix+=$'\n'
         fi
 
         appendix_block=""
