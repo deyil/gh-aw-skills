@@ -50,6 +50,7 @@ runs:
         TAG: ${{ inputs.tag }}
         TITLE: ${{ inputs.title }}
         RELEASE_URL: ${{ inputs.release_url }}
+        RELEASES_URL: ${{ github.server_url }}/${{ github.repository }}/releases
         PUBLISHED_AT: ${{ inputs.published_at }}
         PRERELEASE: ${{ inputs.prerelease }}
         PREVIOUS_TAG: ${{ inputs.previous_tag }}
@@ -64,12 +65,12 @@ runs:
         release_body_template="${template_dir}/release-body.md.tmpl"
         changelog_entry_template="${template_dir}/changelog-entry.md.tmpl"
 
-        main_body="$(printf '%s' "$MAIN_BODY_MARKDOWN" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\) \| )?\[Release page\]\([^\n]+\)\n*\z//s; s/\n+\z//')"
+        main_body="$(printf '%s' "$MAIN_BODY_MARKDOWN" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\)(?: \| |\n))?\[(?:Release|Releases) page\]\([^\n]+\)\n*\z//s; s/\n+\z//')"
         if [[ -z "$main_body" ]]; then
           main_body="- No release notes were provided for this release."
         fi
 
-        appendix_body="$(printf '%s' "$APPENDIX_MARKDOWN" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\) \| )?\[Release page\]\([^\n]+\)\n*\z//s; s/\n+\z//')"
+        appendix_body="$(printf '%s' "$APPENDIX_MARKDOWN" | perl -0pe 's/\n---\n(?:\[Compare changes\]\([^\n]+\)(?: \| |\n))?\[(?:Release|Releases) page\]\([^\n]+\)\n*\z//s; s/\n+\z//')"
 
         release_title="$TAG"
         if [[ -n "$TITLE" ]]; then
@@ -89,7 +90,7 @@ runs:
         compare_prefix=""
         if [[ -n "$PREVIOUS_TAG" ]]; then
           compare_prefix="[Compare changes](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${TAG})"
-          compare_prefix+=$'\n'
+          compare_prefix+=" | "
         fi
 
         appendix_block=""
@@ -102,6 +103,7 @@ runs:
           local template_path="$1"
           TPL_RELEASE_TITLE="$release_title" \
           TPL_RELEASE_URL="$RELEASE_URL" \
+          TPL_RELEASES_URL="$RELEASES_URL" \
           TPL_RELEASE_DATE="$release_date" \
           TPL_PRERELEASE_SUFFIX="$prerelease_suffix" \
           TPL_MAIN_BODY="$main_body" \
@@ -111,6 +113,7 @@ runs:
             my %replacements = (
               RELEASE_TITLE => ($ENV{TPL_RELEASE_TITLE} // q{}),
               RELEASE_URL => ($ENV{TPL_RELEASE_URL} // q{}),
+              RELEASES_URL => ($ENV{TPL_RELEASES_URL} // q{}),
               RELEASE_DATE => ($ENV{TPL_RELEASE_DATE} // q{}),
               PRERELEASE_SUFFIX => ($ENV{TPL_PRERELEASE_SUFFIX} // q{}),
               MAIN_BODY => ($ENV{TPL_MAIN_BODY} // q{}),
