@@ -156,31 +156,12 @@ jobs:
       - name: Build expected changelog file
         id: changelog
         env:
-          RELEASE_URL: ${{ steps.release.outputs.url }}
           CHANGELOG_ENTRY: ${{ steps.render.outputs.rendered_changelog_entry }}
         run: |
           set -euo pipefail
 
-          existing_sections_file="$(mktemp)"
           tmp_file="$(mktemp)"
-          cleanup_files() {
-            rm -f "$existing_sections_file" "$tmp_file"
-          }
-          trap cleanup_files EXIT
-
-          if [[ -f CHANGELOG.md ]]; then
-            awk -v url="$RELEASE_URL" '
-              BEGIN {
-                skipping = 0
-              }
-              /^## \[/ {
-                skipping = index($0, "](" url ")") > 0
-              }
-              !skipping {
-                print
-              }
-            ' CHANGELOG.md | sed -n '/^## /,$p' > "$existing_sections_file"
-          fi
+          trap 'rm -f "$tmp_file"' EXIT
 
           {
             echo "# Changelog"
@@ -190,10 +171,6 @@ jobs:
             echo "Release entries are added by publish-release runs and can be repaired manually."
             echo
             printf '%s\n' "$CHANGELOG_ENTRY"
-            echo
-            if [[ -s "$existing_sections_file" ]]; then
-              cat "$existing_sections_file"
-            fi
           } > "$tmp_file"
 
           if [[ -f CHANGELOG.md ]] && cmp -s "$tmp_file" CHANGELOG.md; then
