@@ -14,7 +14,7 @@ Three GitHub Copilot agent skills that give your AI assistant deep expertise in 
 <h3>Quick Install</h3>
 
 ```bash
-npx skills add https://github.com/deyil/gh-aw-skills
+npx skills add https://github.com/deyil/gh-aw-skills --all
 ```
 
 **Or install individual skills:**
@@ -52,7 +52,7 @@ npx skills add https://github.com/deyil/gh-aw-skills --skill gh-aw-workflow-main
 
 ```bash
 # Install the skills pack
-npx skills add https://github.com/deyil/gh-aw-skills
+npx skills add https://github.com/deyil/gh-aw-skills --all
 
 # Copilot now activates the right skill automatically based on your request.
 
@@ -163,10 +163,10 @@ Activate when editing, fixing, debugging, or upgrading existing workflows.
 ### Install All Skills (Recommended)
 
 ```bash
-npx skills add https://github.com/deyil/gh-aw-skills
+npx skills add https://github.com/deyil/gh-aw-skills --all
 ```
 
-This installs all three skills and pins them in `skills-lock.json`.
+This installs all three skills without the interactive picker and pins them in `skills-lock.json`.
 
 ### Install Individual Skills
 
@@ -206,7 +206,7 @@ npx skills list
 1. **Install the skills pack:**
 
    ```bash
-   npx skills add https://github.com/deyil/gh-aw-skills
+   npx skills add https://github.com/deyil/gh-aw-skills --all
    ```
 
 2. **Open GitHub Copilot in agent mode** in your repository.
@@ -291,8 +291,8 @@ Copilot selects skills based on description match. Be explicit in your phrasing:
 # Check your Node version (18+ required)
 node --version
 
-# Try with the full HTTPS URL
-npx skills add https://github.com/deyil/gh-aw-skills
+# Install the full pack without the interactive picker
+npx skills add https://github.com/deyil/gh-aw-skills --all
 
 # Or specify the skill directly
 npx skills add https://github.com/deyil/gh-aw-skills --skill gh-aw-workflow-authoring
